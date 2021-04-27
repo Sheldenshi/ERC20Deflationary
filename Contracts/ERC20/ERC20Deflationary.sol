@@ -42,8 +42,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     // 1 - Set liquidity fee
     // 2 - Set reflection reward
     // 3 - Set burn %
-    // 4 - Set X% to go a an arbitrary wallet (e.g. dev wallet) 
-    address private constant burnAccount = address(0x000000000000000000000000000000000000dead00);
+    address private constant burnAccount = 0x000000000000000000000000000000000000dEaD;
 
     constructor (string memory name_, string memory symbol_, uint256 totalSupply_,
         uint8 taxFeeBurn_, uint8 taxFeeReward_, uint8 taxFeeLiquidity_) {
@@ -215,7 +214,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         uint256 currentAllowance = _allowances[_msgSender()][spender];
         require(currentAllowance >= subtractedValue, "ERC20: decreased allowance below zero");
         _approve(_msgSender(), spender, currentAllowance - subtractedValue);
-
+        return true;
     }
 
     /**
@@ -292,21 +291,21 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     function reflect(uint256 amount) public {
         address sender = _msgSender();
         require(!_isExcludedFromReward[sender], "Excluded addresses cannot call this function");
-        (uint256[4] memory tValues, uint256[5] memory rValues) = _getValues(amount);
+        (, uint256[5] memory rValues) = _getValues(amount);
         _rBalances[sender] = _rBalances[sender] - rValues[0];
         _rTotal = _rTotal - rValues[0];
         _tFeeTotal = _tFeeTotal +amount ;
     }
 
     // todo: figure out what this does.
-    function reflectionFromToken(uint256 tAmount, bool deductTransferFee) public view returns(uint256) {
-        require(tAmount <= _totalSupply, "Amount must be less than supply");
+    function reflectionFromToken(uint256 amount, bool deductTransferFee) public view returns(uint256) {
+        require(amount <= _totalSupply, "Amount must be less than supply");
         if (!deductTransferFee) {
             (, uint256[5] memory rValues) = _getValues(amount);
             return rValues[0];
         } else {
-            (,uint256 rTransferAmount,,,,,,,) = _getValues(tAmount);
-            return rTransferAmount;
+            (, uint256[5] memory rValues) = _getValues(amount);
+            return rValues[1];
         }
     }
 
@@ -386,12 +385,12 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         rValues = uint256 rAmount, uint256 rTransferAmount, uint256 rBurnFee, uint256 rRewardFee, uint256 rLiquidityFee;
      */
     function _afterTokenTransfer(uint256[4] memory tValues, uint256[5] memory rValues) internal virtual {
-        // burn 
+        // todo: burn 
         
         // reflect
         _reflectFee(rValues[2], tValues[3]);
 
-        // 
+        // todo: add liquidity
      }
 
     // tValues = (uint256 tTransferAmount, uint256 tBurnFee, uint256 tRewardFee, uint256 tLiquidityFee);
