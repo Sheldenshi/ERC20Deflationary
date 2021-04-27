@@ -7,8 +7,6 @@ import "../Utils/SafeMath.sol";
 import "../Utils/Counters.sol";
 import "../Utils/Address.sol";
 import "../Utils/Ownable.sol";
-import "./ERC20.sol";
-import "./ERC20Burnable.sol";
 import "./IERC20.sol";
 
 
@@ -41,9 +39,13 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     string private _symbol;
 
     // account for burning coins.
-    address private constant burnAccount = '0x000000000000000000000000000000000000dead';
+    // 1 - Set liquidity fee
+    // 2 - Set reflection reward
+    // 3 - Set burn %
+    // 4 - Set X% to go a an arbitrary wallet (e.g. dev wallet) 
+    address private constant burnAccount = address(0x000000000000000000000000000000000000dead00);
 
-    constructor (string memory name_, string memory symbol_, uint256 totalSupply_
+    constructor (string memory name_, string memory symbol_, uint256 totalSupply_,
         uint8 taxFeeBurn_, uint8 taxFeeReward_, uint8 taxFeeLiquidity_) {
         
         require(taxFeeBurn_ + taxFeeReward_ + taxFeeLiquidity_ < 100, "Tax fee too high.");
@@ -56,8 +58,10 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         _taxFeeLiquidity = taxFeeLiquidity_;
         _totalSupply = totalSupply_;
         _rTotal = (~uint256(0) - (~uint256(0) % _totalSupply));
+
+        // mint
         _rBalances[_msgSender()] = _rTotal;
-        
+
         // exclude owner and this contract from fee.
         excludeFromFee(owner());
         excludeFromFee(address(this));
@@ -72,7 +76,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     /**
      * @dev Returns the name of the token.
      */
-    function name() public view returns (string memory) {
+    function name() public view virtual returns (string memory) {
         return _name;
     }
 
@@ -80,7 +84,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
      * @dev Returns the symbol of the token, usually a shorter version of the
      * name.
      */
-    function symbol() public view returns (string memory) {
+    function symbol() public view virtual returns (string memory) {
         return _symbol;
     }
 
@@ -93,33 +97,33 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
      * no way affects any of the arithmetic of the contract, including
      * {IERC20-balanceOf} and {IERC20-transfer}.
      */
-    function decimals() public view returns (uint8) {
+    function decimals() public view virtual returns (uint8) {
         return 9;
     }
 
-    function taxFeeBurn() public view returns (uint8) {
+    function taxFeeBurn() public view virtual returns (uint8) {
         return _taxFeeBurn;
     }
 
-    function taxFeeReward() public view returns (uint8) {
+    function taxFeeReward() public view virtual returns (uint8) {
         return _taxFeeReward;
     }
 
-    function taxFeeLiquidity() public view returns (uint8) {
+    function taxFeeLiquidity() public view virtual returns (uint8) {
         return _taxFeeLiquidity;
     }
 
     /**
      * @dev See {IERC20-totalSupply}.
      */
-    function totalSupply() public view override returns (uint256) {
+    function totalSupply() public view virtual override returns (uint256) {
         return _totalSupply;
     }
 
     /**
      * @dev See {IERC20-balanceOf}.
      */
-    function balanceOf(address account) public view override returns (uint256) {
+    function balanceOf(address account) public view virtual override returns (uint256) {
         if (_isExcludedFromReward[account]) return _tBalances[account];
         return tokenFromReflection(_rBalances[account]);
     }
@@ -132,7 +136,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
      * - `recipient` cannot be the zero address.
      * - the caller must have a balance of at least `amount`.
      */
-    function transfer(address recipient, uint256 amount) public override returns (bool) {
+    function transfer(address recipient, uint256 amount) public virtual override returns (bool) {
         _transfer(_msgSender(), recipient, amount);
         return true;
     }
@@ -140,7 +144,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     /**
      * @dev See {IERC20-allowance}.
      */
-    function allowance(address owner, address spender) public view override returns (uint256) {
+    function allowance(address owner, address spender) public view virtual override returns (uint256) {
         return _allowances[owner][spender];
     }
 
@@ -151,7 +155,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
      *
      * - `spender` cannot be the zero address.
      */
-    function approve(address spender, uint256 amount) public override returns (bool) {
+    function approve(address spender, uint256 amount) public virtual override returns (bool) {
         _approve(_msgSender(), spender, amount);
         return true;
     }
@@ -169,9 +173,9 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
      * - the caller must have allowance for ``sender``'s tokens of at least
      * `amount`.
      */
-    function transferFrom(address sender, address recipient, uint256 amount) public override returns (bool) {
+    function transferFrom(address sender, address recipient, uint256 amount) public virtual override returns (bool) {
         _transfer(sender, recipient, amount);
-        _approve(sender, _msgSender(), _allowances[sender][_msgSender()].sub(amount, "ERC20: transfer amount exceeds allowance"));
+        _approve(sender, _msgSender(), _allowances[sender][_msgSender()]- amount, "ERC20: transfer amount exceeds allowance");
         return true;
     }
 
@@ -188,7 +192,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
      * - `spender` cannot be the zero address.
      */
     function increaseAllowance(address spender, uint256 addedValue) public virtual returns (bool) {
-        _approve(_msgSender(), spender, _allowances[_msgSender()][spender].add(addedValue));
+        _approve(_msgSender(), spender, _allowances[_msgSender()][spender]+addedValue);
         return true;
     }
 
@@ -207,7 +211,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
      * `subtractedValue`.
      */
     function decreaseAllowance(address spender, uint256 subtractedValue) public virtual returns (bool) {
-        _approve(_msgSender(), spender, _allowances[_msgSender()][spender].sub(subtractedValue, "ERC20: decreased allowance below zero"));
+        _approve(_msgSender(), spender, _allowances[_msgSender()][spender]- subtractedValue, "ERC20: decreased allowance below zero");
         return true;
     }
 
@@ -234,10 +238,13 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
             _rBalances[account] -= amount;
         }
 
+        _tBalances[burnAccount] += amount;
+
         // decrease the total coin supply
         _totalSupply -= amount;
 
         // todo: update _rTotal
+        _rTotal -= amount;
 
         emit Transfer(account, burnAccount, amount);
     }
@@ -272,36 +279,42 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         return _isExcludedFromReward[account];
     }
 
-    function totalFees() public view returns (uint256) {
+    function totalFees() public view virtual returns (uint256) {
         return _tFeeTotal;
     }
 
+    // todo: figure out what this does.
     function reflect(uint256 tAmount) public {
         address sender = _msgSender();
         require(!_isExcludedFromReward[sender], "Excluded addresses cannot call this function");
-        (uint256 rAmount,,,,) = _getValues(tAmount);
-        _rBalances[sender] = _rBalances[sender].sub(rAmount);
-        _rTotal = _rTotal.sub(rAmount);
-        _tFeeTotal = _tFeeTotal.add(tAmount);
+        (uint256 rAmount,,,,,,,,) = _getValues(tAmount);
+        _rBalances[sender] = _rBalances[sender] - rAmount;
+        _rTotal = _rTotal- rAmount;
+        _tFeeTotal = _tFeeTotal+tAmount;
     }
 
+    // todo: figure out what this does.
     function reflectionFromToken(uint256 tAmount, bool deductTransferFee) public view returns(uint256) {
         require(tAmount <= _totalSupply, "Amount must be less than supply");
         if (!deductTransferFee) {
-            (uint256 rAmount,,,,) = _getValues(tAmount);
+            (uint256 rAmount,,,,,,,,) = _getValues(tAmount);
             return rAmount;
         } else {
-            (,uint256 rTransferAmount,,,) = _getValues(tAmount);
+            (,uint256 rTransferAmount,,,,,,,) = _getValues(tAmount);
             return rTransferAmount;
         }
     }
 
+    /**
+        Used to figure out the balance of rBalance.
+     */
     function tokenFromReflection(uint256 rAmount) public view returns(uint256) {
         require(rAmount <= _rTotal, "Amount must be less than total reflections");
         uint256 currentRate =  _getRate();
         return rAmount.div(currentRate);
     }
 
+    // suggestion: merge
     function excludeFromFee(address account) public onlyOwner {
         _isExcludedFromFee[account] = true;
     }
@@ -320,7 +333,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     }
 
     function includeAccountFromReward(address account) public onlyOwner {
-        require(_isExcludedFromReward[account], "Account is already excluded");
+        require(_isExcludedFromReward[account], "Account is already included");
         for (uint256 i = 0; i < _excludedFromReward.length; i++) {
             if (_excludedFromReward[i] == account) {
                 _excludedFromReward[i] = _excludedFromReward[_excludedFromReward.length - 1];
@@ -344,6 +357,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         require(sender != address(0), "ERC20: transfer from the zero address");
         require(recipient != address(0), "ERC20: transfer to the zero address");
         require(amount > 0, "Transfer amount must be greater than zero");
+
         if (_isExcludedFromReward[sender] && !_isExcludedFromReward[recipient]) {
             _transferFromExcluded(sender, recipient, amount);
         } else if (!_isExcludedFromReward[sender] && _isExcludedFromReward[recipient]) {
@@ -357,68 +371,115 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         }
     }
 
-    function _transferStandard(address sender, address recipient, uint256 tAmount) private {
-        (uint256 rAmount, uint256 rTransferAmount, uint256 rFee, uint256 tTransferAmount, uint256 tFee) = _getValues(tAmount);
-        _rBalances[sender] = _rBalances[sender].sub(rAmount);
-        _rBalances[recipient] = _rBalances[recipient].add(rTransferAmount);       
-        _reflectFee(rFee, tFee);
+
+    /**
+     * burns
+     * reflect
+     * add liquidity
+     */
+    function _afterTokenTransfer(uint256[5] memory rValues, uint256[4] memory tValues) internal virtual {
+        (uint256 tTransferAmount, uint256 tBurnFee, uint256 tRewardFee, uint256 tLiquidityFee) = tValues;
+        (uint256 rAmount, uint256 rTransferAmount, uint256 rBurnFee, uint256 rRewardFee, uint256 rLiquidityFee) = rValues;
+        // burn 
+
+        // reflect
+        _reflectFee(rRewardFee, tRewardFee);
+
+        // 
+     }
+
+ 
+    function _transferStandard(address sender, address recipient, uint256 amount) private {
+        (uint256[5] memory rValues, uint256[4] memory tValues) = _getValues(amount);
+        (uint256 tTransferAmount, uint256 tBurnFee, uint256 tRewardFee, uint256 tLiquidityFee) = tValues;
+        (uint256 rAmount, uint256 rTransferAmount, uint256 rBurnFee, uint256 rRewardFee, uint256 rLiquidityFee) = rValues;
+        _rBalances[sender] = _rBalances[sender] - rAmount;
+        _rBalances[recipient] = _rBalances[recipient] + rTransferAmount;   
+        
+        _afterTokenTransfer(tValues, rValues);
+
+        emit Transfer(sender, recipient, tValues['transferAmount']);
+    }
+
+    function _transferToExcluded(address sender, address recipient, uint256 amount) private {
+        (uint256[5] memory rValues, uint256[4] memory tValues) = _getValues(amount);
+        (uint256 tTransferAmount, uint256 tBurnFee, uint256 tRewardFee, uint256 tLiquidityFee) = tValues;
+        (uint256 rAmount, uint256 rTransferAmount, uint256 rBurnFee, uint256 rRewardFee, uint256 rLiquidityFee) = rValues;
+        
+        _rBalances[sender] = _rBalances[sender] - rAmount;
+        _tBalances[recipient] = _tBalances[recipient] + tTransferAmount;
+        _rBalances[recipient] = _rBalances[recipient] + rTransferAmount;    
+
+        _afterTokenTransfer(tValues, rValues);
+        
         emit Transfer(sender, recipient, tTransferAmount);
     }
 
-    function _transferToExcluded(address sender, address recipit, uint256 tAmount) private {
-        (uint256 rAmount, uint256 rTransferAmount, uint256 rFee, uint256 tTransferAmount, uint256 tFee) = _getValues(tAmount);
-        _rBalances[sender] = _rBalances[sender].sub(rAmount);
-        _tBalances[recipient] = _tBalances[recipient].add(tTransferAmount);
-        _rBalances[recipient] = _rBalances[recipient].add(rTransferAmount);           
-        _reflectFee(rFee, tFee);
+    function _transferFromExcluded(address sender, address recipient, uint256 amount) private {
+        (uint256[5] memory rValues, uint256[4] memory tValues) = _getValues(amount);
+        (uint256 tTransferAmount, uint256 tBurnFee, uint256 tRewardFee, uint256 tLiquidityFee) = tValues;
+        (uint256 rAmount, uint256 rTransferAmount, uint256 rBurnFee, uint256 rRewardFee, uint256 rLiquidityFee) = rValues;
+        
+        _tBalances[sender] = _tBalances[sender] - amount;
+        _rBalances[sender] = _rBalances[sender] - rAmount;
+        _rBalances[recipient] = _rBalances[recipient] + rTransferAmount;   
+
+        _afterTokenTransfer(tValues, rValues);
+
         emit Transfer(sender, recipient, tTransferAmount);
     }
 
-    function _transferFromExcluded(address sender, address recipient, uint256 tAmount) private {
-        (uint256 rAmount, uint256 rTransferAmount, uint256 rFee, uint256 tTransferAmount, uint256 tFee) = _getValues(tAmount);
-        _tBalances[sender] = _tBalances[sender].sub(tAmount);
-        _rBalances[sender] = _rBalances[sender].sub(rAmount);
-        _rBalances[recipient] = _rBalances[recipient].add(rTransferAmount);   
-        _reflectFee(rFee, tFee);
-        emit Transfer(sender, recipient, tTransferAmount);
-    }
+    function _transferBothExcluded(address sender, address recipient, uint256 amount) private {
+        (uint256[5] memory rValues, uint256[4] memory tValues) = _getValues(amount);
+        (uint256 tTransferAmount, uint256 tBurnFee, uint256 tRewardFee, uint256 tLiquidityFee) = tValues;
+        (uint256 rAmount, uint256 rTransferAmount, uint256 rBurnFee, uint256 rRewardFee, uint256 rLiquidityFee) = rValues;
 
-    function _transferBothExcluded(address sender, address recipient, uint256 tAmount) private {
-        (uint256 rAmount, uint256 rTransferAmount, uint256 rFee, uint256 tTransferAmount, uint256 tFee) = _getValues(tAmount);
-        _tBalances[sender] = _tBalances[sender].sub(tAmount);
-        _rBalances[sender] = _rBalances[sender].sub(rAmount);
-        _tBalances[recipient] = _tBalances[recipient].add(tTransferAmount);
-        _rBalances[recipient] = _rBalances[recipient].add(rTransferAmount);        
-        _reflectFee(rFee, tFee);
+        _tBalances[sender] = _tBalances[sender] - amount;
+        _rBalances[sender] = _rBalances[sender] - rAmount;
+        _tBalances[recipient] = _tBalances[recipient] + tTransferAmount;
+        _rBalances[recipient] = _rBalances[recipient] + rTransferAmount;        
+
+        _afterTokenTransfer(tValues, rValues);
+        
         emit Transfer(sender, recipient, tTransferAmount);
     }
 
     function _reflectFee(uint256 rFee, uint256 tFee) private {
-        _rTotal = _rTotal.sub(rFee);
-        _tFeeTotal = _tFeeTotal.add(tFee);
+        // to decrease rate thus increase amount reward receive.
+        _rTotal = _rTotal - rFee;
+        _tFeeTotal = _tFeeTotal + tFee;
     }
 
-    function _getValues(uint256 tAmount) private view returns (uint256, uint256, uint256, uint256, uint256) {
-        (uint256 tTransferAmount, uint256 tFee, uint256 tLiquidity) = _getTValues(tAmount);
-        uint256 currentRate =  _getRate();
-        (uint256 rAmount, uint256 rTransferAmount, uint256 rFee) = _getRValues(tAmount, tFee, tLiquidity, currentRate);
-        return (rAmount, rTransferAmount, rFee, tTransferAmount, tFee);
+    function _getValues(uint256 amount) private view returns (uint256[4] memory, uint256[5] memory) {
+        uint256[4] memory tValues = _getTValues(amount);
+        uint256[5] memory rValues = _getRValues(amount, tValues, _getRate());
+        return (tValues, rValues);
+    }
+    // function _getValues(uint256 amount) private view returns (uint256[5] memory, uint256[4] memory) {
+    //     (uint256 tTransferAmount, uint256 tBurnFee, uint256 tRewardFee, uint256 tLiquidityFee) = _getTValues(amount);
+    //     (uint256 rAmount, uint256 rTransferAmount, uint256 rBurnFee, uint256 rRewardFee, uint256 rLiquidityFee) = _getRValues(amount, tBurnFee, tRewardFee, tLiquidityFee, _getRate());
+    //     return ([rAmount, rTransferAmount, rBurnFee, rRewardFee, rLiquidityFee], [tTransferAmount, tBurnFee, tRewardFee, tLiquidityFee]);
+    // }
+
+    function _getTValues(uint256 amount) private view returns (uint256[4] memory) {
+        // calculate fee
+        uint256 tBurnFee = _calculateTaxFeeBurn(amount);
+        uint256 tRewardFee = _calculateTaxFeeReward(amount);
+        uint256 tLiquidityFee = _calculateTaxFeeLiquidity(amount);
+        
+        // amount after fee
+        uint256 tTransferAmount = amount - tBurnFee - tRewardFee - tLiquidityFee;
+        return [tTransferAmount, tBurnFee, tRewardFee, tLiquidityFee];
     }
 
-    function _getTValues(uint256 tAmount) private pure returns (uint256, uint256) {
-        uint256 tBurnFee = _calculateTaxFeeBurn(tAmount);
-        uint256 tRewardFee = _calculateTaxFeeReward(tAmount);
-        uint256 tLiquidityFee = _calculateTaxFeeLiquidity(tAmount);
-        uint256 tTransferAmount = tAmount.sub(tBurnFee).sub(tRewardFee).sub(tLiquidityFee);
-        return (tTransferAmount, tBurnFee, tRewardFee, tLiquidityFee);
-    }
-
-    function _getRValues(uint256 tAmount, uint256 tFee, uint256 tLiquidity, uint256 currentRate) private pure returns (uint256, uint256, uint256) {
-        uint256 rAmount = tAmount.mul(currentRate);
-        uint256 rFee = tFee.mul(currentRate);
-        uint256 rLiquidity = tLiquidity.mul(currentRate);
-        uint256 rTransferAmount = rAmount.sub(rFee).sub(rLiquidity);
-        return (rAmount, rTransferAmount, rFee);
+    function _getRValues(uint256 amount, uint256[4] memory tValues, uint256 currentRate) private pure returns (uint256[5] memory) {
+        (uint256 tTransferAmount, uint256 tBurnFee, uint256 tRewardFee, uint256 tLiquidityFee) = tValues;
+        uint256 rAmount = amount * currentRate;
+        uint256 rBurnFee = tBurnFee * currentRate;
+        uint256 rRewardFee = tRewardFee * currentRate;
+        uint256 rLiquidityFee = tLiquidityFee * currentRate;
+        uint256 rTransferAmount = rAmount - rBurnFee - rRewardFee - rLiquidityFee;
+        return [rAmount, rTransferAmount, rBurnFee, rRewardFee, rLiquidityFee];
     }
 
     function _getRate() private view returns(uint256) {
@@ -431,35 +492,35 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         uint256 tSupply = _totalSupply;      
         for (uint256 i = 0; i < _excludedFromReward.length; i++) {
             if (_rBalances[_excludedFromReward[i]] > rSupply || _tBalances[_excludedFromReward[i]] > tSupply) return (_rTotal, _totalSupply);
-            rSupply = rSupply.sub(_rBalances[_excludedFromReward[i]]);
-            tSupply = tSupply.sub(_tBalances[_excludedFromReward[i]]);
+            rSupply = rSupply - _rBalances[_excludedFromReward[i]];
+            tSupply = tSupply - _tBalances[_excludedFromReward[i]];
         }
         if (rSupply < _rTotal.div(_totalSupply)) return (_rTotal, _totalSupply);
         return (rSupply, tSupply);
     }
 
-    function setTaxFeeBurn(uint256 taxFeeBurn_) external onlyOwner {
+    function setTaxFeeBurn(uint8 taxFeeBurn_) external onlyOwner {
         _taxFeeBurn = taxFeeBurn_;
     }
 
-    function setTaxFeeReward(uint256 taxFeeReward_) external onlyOwner {
+    function setTaxFeeReward(uint8 taxFeeReward_) external onlyOwner {
         _taxFeeReward = taxFeeReward_;
     }
 
-    function setTaxFeeLiquidity(uint256 taxFeeLiquidity_) external onlyOwner {
+    function setTaxFeeLiquidity(uint8 taxFeeLiquidity_) external onlyOwner {
         _taxFeeLiquidity = taxFeeLiquidity_;
     }
 
-    function _calculateTaxFeeBurn(uint256 amount) private pure returns (uint256) {
-        return amount.mul(_taxFeeBurn).div(10**2);
+    function _calculateTaxFeeBurn(uint256 amount) private view returns (uint256) {
+        return amount*_taxFeeBurn.div(10**2);
     }
 
-    function _calculateTaxFeeReward(uint256 amount) private pure returns (uint256) {
-        return amount.mul(_taxFeeReward).div(10**2);
+    function _calculateTaxFeeReward(uint256 amount) private view returns (uint256) {
+        return amount*_taxFeeReward.div(10**2);
     }
 
-    function _calculateTaxFeeLiquidity(uint256 amount) private pure returns (uint256) {
-        return amount.mul(_taxFeeLiquidity).div(10**2);
+    function _calculateTaxFeeLiquidity(uint256 amount) private view returns (uint256) {
+        return amount*_taxFeeLiquidity.div(10**2);
     }
 
 }
