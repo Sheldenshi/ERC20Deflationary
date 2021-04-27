@@ -9,7 +9,6 @@ import "../Utils/Ownable.sol";
 import "./IERC20.sol";
 
 contract ERC20Deflationary is Context, IERC20, Ownable {
-    using SafeMath for uint256;
     using Address for address;
 
     // balances for address that are included.
@@ -19,6 +18,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     mapping(address => mapping(address => uint256)) private _allowances;
 
     mapping(address => bool) private _isAccountExcludedFromFee;
+    // _isAccountExcludedFromReward vs _excludeAccountFromReward?
     mapping(address => bool) private _isAccountExcludedFromReward;
     address[] private _excludeAccountFromReward;
 
@@ -33,6 +33,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     // percent of transaction amount that will be added to the liquidity pool
     uint8 private _taxFeeLiquidity;
 
+    // TODO: Add decimals to the constructor
     string private _name;
     string private _symbol;
 
@@ -360,7 +361,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     }
 
     // todo: figure out what this does.
-    // Seems to be utterly useless...
+    // Seems to be utterly useless... 🤔
     function reflectionFromToken(uint256 tAmount, bool deductTransferFee)
         public
         view
@@ -392,7 +393,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         return rAmount / currentRate;
     }
 
-    // suggestion: merge
+    // suggestion: merge <- DONE
     function excludeFromFee(address account) public onlyOwner {
         _isAccountExcludedFromFee[account] = true;
     }
@@ -490,7 +491,6 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
 
     // TODO
     function _transfert(
-        string transactionType,
         address sender,
         address recipient,
         uint256 amount
@@ -523,8 +523,6 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         ) {
             _tBalances[sender] = _tBalances[sender] - amount;
             _tBalances[recipient] = _tBalances[recipient] + tValues[0];
-        } else {
-            continue;
         }
 
         // logic goes there, if tvalue or rvalue = 0 relevant functions will run but do nothing as require will be added at the start of each functions burn, liquidity and reward
@@ -692,10 +690,9 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         returns (uint256[4] memory)
     {
         // calculate fee
-        uint256 tBurnFee = _getTaxAmount(amount, _taxFeeBurn);
-        uint256 tRewardFee = _calculateTaxFeeReward(amount, _taxFeeReward);
-        uint256 tLiquidityFee =
-            _calculateTaxFeeLiquidity(amount, _taxFeeLiquidity);
+        uint256 tBurnFee = _getTax(amount, _taxFeeBurn);
+        uint256 tRewardFee = _getTax(amount, _taxFeeReward);
+        uint256 tLiquidityFee = _getTax(amount, _taxFeeLiquidity);
 
         // amount after fee
         uint256 tTransferAmount =
@@ -739,14 +736,23 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         return (rSupply, tSupply);
     }
 
-    // that is a suggestion and the code is self-explanatory, that considerably shorten the code
-    function _setTaxAmount(uint256 amount, string taxType) external onlyOwner {
+    // These 3 functions do exactly the same thing, lot fo code repetitions and
+    // unecessary functions making the code longer and therefore more expensive gas fee wise
+    function _getTax(uint256 amount, uint8 tax) private view returns (uint256) {
+        return (amount * tax) / 100;
+    }
+
+    function _setTax(
+        uint256 amount,
+        string taxType,
+        uint8 tax
+    ) external onlyOwner {
         if (taxType == "liquidity") {
-            _taxFeeLiquidity = taxFeeLiquidity_;
+            _taxFeeLiquidity = tax;
         } else if (taxType == "reward") {
-            _taxFeeReward = taxFeeReward_;
-        } else {
-            _taxFeeBurn = taxFeeBurn_;
+            _taxFeeReward = tax;
+        } else if (taxType == "burn") {
+            _taxFeeBurn = tax;
         }
     }
 
@@ -760,15 +766,6 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
 
     function setTaxFeeLiquidity(uint8 taxFeeLiquidity_) external onlyOwner {
         _taxFeeLiquidity = taxFeeLiquidity_;
-    }
-
-    // These 3 functions do exactly the same thing, lot fo code repetitions and unecessary functions making the code longer and therefore more expensive gas fee wise
-    function _getTaxAmount(uint256 amount, uint8 taxType)
-        private
-        view
-        returns (uint256)
-    {
-        return (amount * taxType) / (10**2);
     }
 
     function _calculateTaxFeeBurn(uint256 amount)
