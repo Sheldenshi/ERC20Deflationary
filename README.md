@@ -18,8 +18,12 @@ pragma solidity ^0.8.4;
 import "./ERC20Deflationary.sol";
 
 contract TestCoin is ERC20Deflationary {
-    constructor() ERC20Deflationary("TestCoin", "TEST", 100000000000, 0, 10, 0) {
-        
+    constructor() ERC20Deflationary("TestCoin", "TEST", 9, 100) {
+         // default is 0
+         // not required
+         setTaxFeeBurn(a);
+         setTaxFeeReward(b);
+         setTaxFeeLiquidity(c);
     }
 }
 ```
