@@ -40,6 +40,8 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     // 3 - Set burn %
     address private constant burnAccount = 0x000000000000000000000000000000000000dEaD;
 
+    event Burn(address from, uint256 amount);
+
     constructor (string memory name_, string memory symbol_, uint8 decimals_, uint256 totalSupply_) {
         // Sets the values for `name`, `symbol`, `totalSupply`, `taxFeeBurn`, `taxFeeReward`, and `taxFeeLiquidity`.
         _name = name_;
@@ -242,7 +244,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
 
         // todo: update _rTotal
 
-        emit Transfer(account, burnAccount, amount);
+        emit Burn(account, amount);
     }
    
     /**
