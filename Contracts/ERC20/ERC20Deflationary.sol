@@ -2,15 +2,12 @@
 
 pragma solidity ^0.8.0;
 
-import "../Utils/Address.sol";
 import "../Utils/Context.sol";
 import "../Utils/Ownable.sol";
 import "./IERC20.sol";
 
 
 contract ERC20Deflationary is Context, IERC20, Ownable {
-    using Address for address;
-
     // balances for address that are included.
     mapping (address => uint256) private _rBalances;
     // balances for address that are excluded.
@@ -21,6 +18,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     mapping (address => bool) private _isExcludedFromReward;
     address[] private _excludedFromReward;
    
+    uint8 private  _decimals;
     uint256 private  _totalSupply;
     uint256 private _rTotal;
     uint256 private _tFeeTotal;
@@ -41,7 +39,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     // 3 - Set burn %
     address private constant burnAccount = 0x000000000000000000000000000000000000dEaD;
 
-    constructor (string memory name_, string memory symbol_, uint256 totalSupply_,
+    constructor (string memory name_, string memory symbol_, uint8 decimals_, uint256 totalSupply_,
         uint8 taxFeeBurn_, uint8 taxFeeReward_, uint8 taxFeeLiquidity_) {
         
         require(taxFeeBurn_ + taxFeeReward_ + taxFeeLiquidity_ < 100, "Tax fee too high.");
@@ -52,7 +50,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         _taxFeeBurn = taxFeeBurn_;
         _taxFeeReward = taxFeeReward_;
         _taxFeeLiquidity = taxFeeLiquidity_;
-        _totalSupply = totalSupply_;
+        _totalSupply = totalSupply_ * 10**decimals_;
         _rTotal = (~uint256(0) - (~uint256(0) % _totalSupply));
 
         // mint
@@ -94,7 +92,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
      * {IERC20-balanceOf} and {IERC20-transfer}.
      */
     function decimals() public view virtual returns (uint8) {
-        return 9;
+        return _decimals;
     }
 
     function taxFeeBurn() public view virtual returns (uint8) {
