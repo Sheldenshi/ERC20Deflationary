@@ -53,8 +53,8 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         _rBalances[_msgSender()] = _rTotal;
 
         // exclude owner and this contract from fee.
-        excludeFromFee(owner());
-        excludeFromFee(address(this));
+        _excludeFromFee(owner());
+        _excludeFromFee(address(this));
 
         // exclude owner and burnAccount from receiving rewards.
         excludeAccountFromReward(owner());
@@ -308,12 +308,12 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         return rAmount / currentRate;
     }
 
-    // suggestion: merge
-    function excludeFromFee(address account) public onlyOwner {
+    
+    function _excludeFromFee(address account) private onlyOwner {
         _isExcludedFromFee[account] = true;
     }
 
-    function includeInFee(address account) public onlyOwner {
+    function _includeInFee(address account) private onlyOwner {
         _isExcludedFromFee[account] = false;
     }
 
@@ -378,7 +378,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         // todo: burn 
         
         // reflect
-        _reflectFee(rValues[3], tValues[2]);
+        _distributeFee(rValues[3], tValues[2]);
 
         // todo: add liquidity
      }
@@ -439,7 +439,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         emit Transfer(sender, recipient, tValues[0]);
     }
 
-    function _reflectFee(uint256 rFee, uint256 tFee) private {
+    function _distributeFee(uint256 rFee, uint256 tFee) private {
         // to decrease rate thus increase amount reward receive.
         _rTotal = _rTotal - rFee;
         _tFeeTotal = _tFeeTotal + tFee;
