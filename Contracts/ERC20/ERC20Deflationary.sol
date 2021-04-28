@@ -42,6 +42,8 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
 
     event Burn(address from, uint256 amount);
 
+    
+
     constructor (string memory name_, string memory symbol_, uint8 decimals_, uint256 totalSupply_) {
         // Sets the values for `name`, `symbol`, `totalSupply`, `taxFeeBurn`, `taxFeeReward`, and `taxFeeLiquidity`.
         _name = name_;
@@ -454,6 +456,20 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         // to decrease rate thus increase amount reward receive.
         _rTotal = _rTotal - rFee;
         _tFeeTotal = _tFeeTotal + tFee;
+    }
+    
+    struct ValuesFromAmount {
+        uint256 tBurnFee;
+        uint256 tRewardFee;
+        uint256 tLiquidityFee;
+        // amount after fee
+        uint256 tTransferAmount;
+
+        uint256 rAmount;
+        uint256 rBurnFee;
+        uint256 rRewardFee;
+        uint256 rLiquidityFee;
+        uint256 rTransferAmount;
     }
 
     function _getValues(uint256 amount) private view returns (uint256[4] memory, uint256[5] memory) {
