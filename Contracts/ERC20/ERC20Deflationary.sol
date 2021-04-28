@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.4;
 
 import "../Utils/Context.sol";
 import "../Utils/Ownable.sol";
@@ -14,7 +14,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     mapping (address => uint256) private _tBalances;
     mapping (address => mapping (address => uint256)) private _allowances;
 
-    mapping(address => bool) private _isExcludedFromFee;
+    mapping (address => bool) private _isExcludedFromFee;
     mapping (address => bool) private _isExcludedFromReward;
     address[] private _excludedFromReward;
    
@@ -47,10 +47,11 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         // Sets the values for `name`, `symbol`, `totalSupply`, `taxFeeBurn`, `taxFeeReward`, and `taxFeeLiquidity`.
         _name = name_;
         _symbol = symbol_;
+        _decimals = decimals_;
         _taxFeeBurn = taxFeeBurn_;
         _taxFeeReward = taxFeeReward_;
         _taxFeeLiquidity = taxFeeLiquidity_;
-        _totalSupply = totalSupply_ * 10**decimals_;
+        _totalSupply = totalSupply_ * (10**decimals_);
         _rTotal = (~uint256(0) - (~uint256(0) % _totalSupply));
 
         // mint
@@ -289,17 +290,16 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         (, uint256[5] memory rValues) = _getValues(amount);
         _rBalances[sender] = _rBalances[sender] - rValues[0];
         _rTotal = _rTotal - rValues[0];
-        _tFeeTotal = _tFeeTotal +amount ;
+        _tFeeTotal = _tFeeTotal + amount ;
     }
 
     // todo: figure out what this does.
     function reflectionFromToken(uint256 amount, bool deductTransferFee) public view returns(uint256) {
         require(amount <= _totalSupply, "Amount must be less than supply");
+        (, uint256[5] memory rValues) = _getValues(amount);
         if (!deductTransferFee) {
-            (, uint256[5] memory rValues) = _getValues(amount);
             return rValues[0];
         } else {
-            (, uint256[5] memory rValues) = _getValues(amount);
             return rValues[1];
         }
     }
