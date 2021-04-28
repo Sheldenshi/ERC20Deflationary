@@ -20,6 +20,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
    
     uint8 private  _decimals;
     uint256 private  _totalSupply;
+    uint256 private _currentSupply;
     uint256 private _rTotal;
     uint256 private _tFeeTotal;
 
@@ -39,19 +40,13 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     // 3 - Set burn %
     address private constant burnAccount = 0x000000000000000000000000000000000000dEaD;
 
-    constructor (string memory name_, string memory symbol_, uint8 decimals_, uint256 totalSupply_,
-        uint8 taxFeeBurn_, uint8 taxFeeReward_, uint8 taxFeeLiquidity_) {
-        
-        require(taxFeeBurn_ + taxFeeReward_ + taxFeeLiquidity_ < 100, "Tax fee too high.");
-        
+    constructor (string memory name_, string memory symbol_, uint8 decimals_, uint256 totalSupply_) {
         // Sets the values for `name`, `symbol`, `totalSupply`, `taxFeeBurn`, `taxFeeReward`, and `taxFeeLiquidity`.
         _name = name_;
         _symbol = symbol_;
         _decimals = decimals_;
-        _taxFeeBurn = taxFeeBurn_;
-        _taxFeeReward = taxFeeReward_;
-        _taxFeeLiquidity = taxFeeLiquidity_;
         _totalSupply = totalSupply_ * (10**decimals_);
+        _currentSupply = totalSupply_;
         _rTotal = (~uint256(0) - (~uint256(0) % _totalSupply));
 
         // mint
@@ -502,14 +497,17 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     }
 
     function setTaxFeeBurn(uint8 taxFeeBurn_) external onlyOwner {
+        require(taxFeeBurn_ + _taxFeeReward + _taxFeeLiquidity < 100, "Tax fee too high.");
         _taxFeeBurn = taxFeeBurn_;
     }
 
     function setTaxFeeReward(uint8 taxFeeReward_) external onlyOwner {
+        require(_taxFeeBurn + taxFeeReward_ + _taxFeeLiquidity < 100, "Tax fee too high.");
         _taxFeeReward = taxFeeReward_;
     }
 
     function setTaxFeeLiquidity(uint8 taxFeeLiquidity_) external onlyOwner {
+        require(_taxFeeBurn + _taxFeeReward + taxFeeLiquidity_ < 100, "Tax fee too high.");
         _taxFeeLiquidity = taxFeeLiquidity_;
     }
 
