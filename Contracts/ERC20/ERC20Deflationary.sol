@@ -504,17 +504,17 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         return (rSupply, tSupply);
     }
 
-    function setTaxFeeBurn(uint8 taxFeeBurn_) external onlyOwner {
+    function setTaxFeeBurn(uint8 taxFeeBurn_) public onlyOwner {
         require(taxFeeBurn_ + _taxFeeReward + _taxFeeLiquidity < 100, "Tax fee too high.");
         _taxFeeBurn = taxFeeBurn_;
     }
 
-    function setTaxFeeReward(uint8 taxFeeReward_) external onlyOwner {
+    function setTaxFeeReward(uint8 taxFeeReward_) public onlyOwner {
         require(_taxFeeBurn + taxFeeReward_ + _taxFeeLiquidity < 100, "Tax fee too high.");
         _taxFeeReward = taxFeeReward_;
     }
 
-    function setTaxFeeLiquidity(uint8 taxFeeLiquidity_) external onlyOwner {
+    function setTaxFeeLiquidity(uint8 taxFeeLiquidity_) public onlyOwner {
         require(_taxFeeBurn + _taxFeeReward + taxFeeLiquidity_ < 100, "Tax fee too high.");
         _taxFeeLiquidity = taxFeeLiquidity_;
     }
