@@ -225,19 +225,22 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         uint256 accountBalance = balanceOf(account);
         require(accountBalance >= amount, "ERC20: burn amount exceeds balance");
 
+        uint256 rAmount = _getRValuesWithoutFee(amount);
+
         if (isExcluded(account)) {
             _tBalances[account] -= amount;
+            _rBalances[account] -= rAmount;
         } else {
-            _rBalances[account] -= _getRValuesWithoutFee(amount);
+            _rBalances[account] -= rAmount;
         }
 
         _tBalances[burnAccount] += amount;
+        _rBalances[burnAccount] += rAmount;
 
         // decrease the total coin supply
         _totalSupply -= amount;
 
         // todo: update _rTotal
-        _rTotal -= amount;
 
         emit Transfer(account, burnAccount, amount);
     }
