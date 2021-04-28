@@ -11,7 +11,7 @@ Currently supports static reward (automatically redistribute b% of each transact
 Feel free to submit an issue or pull request :)
 
 
-## How to use with example:
+## How to use:
 ```
 pragma solidity ^0.8.4;
 
