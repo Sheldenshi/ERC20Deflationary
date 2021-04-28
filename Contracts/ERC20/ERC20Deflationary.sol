@@ -228,7 +228,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         if (isExcluded(account)) {
             _tBalances[account] -= amount;
         } else {
-            _rBalances[account] -= amount;
+            _rBalances[account] -= _getRValuesWithoutFee(amount);
         }
 
         _tBalances[burnAccount] += amount;
@@ -477,6 +477,11 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         uint256 rLiquidityFee = tValues[3] * currentRate;
         uint256 rTransferAmount = rAmount - rBurnFee - rRewardFee - rLiquidityFee;
         return [rAmount, rTransferAmount, rBurnFee, rRewardFee, rLiquidityFee];
+    }
+
+    function _getRValuesWithoutFee(uint256 amount) private view returns (uint256) {
+        uint256 currentRate = _getRate();
+        return amount * currentRate;
     }
 
     function _getRate() private view returns(uint256) {
