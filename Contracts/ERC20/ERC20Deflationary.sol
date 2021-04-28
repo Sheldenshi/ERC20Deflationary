@@ -315,7 +315,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     function tokenFromReflection(uint256 rAmount) public view returns(uint256) {
         require(rAmount <= _rTotal, "Amount must be less than total reflections");
         uint256 currentRate =  _getRate();
-        return rAmount.div(currentRate);
+        return rAmount / currentRate;
     }
 
     // suggestion: merge
@@ -388,7 +388,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         // todo: burn 
         
         // reflect
-        _reflectFee(rValues[2], tValues[3]);
+        _reflectFee(rValues[3], tValues[2]);
 
         // todo: add liquidity
      }
@@ -427,7 +427,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         
         _tBalances[sender] = _tBalances[sender] - amount;
         _rBalances[sender] = _rBalances[sender] - rValues[0];
-        _rBalances[recipient] = _rBalances[recipient] + tValues[1];   
+        _rBalances[recipient] = _rBalances[recipient] + rValues[1];   
 
         _afterTokenTransfer(tValues, rValues);
 
@@ -457,7 +457,8 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
 
     function _getValues(uint256 amount) private view returns (uint256[4] memory, uint256[5] memory) {
         uint256[4] memory tValues = _getTValues(amount);
-        uint256[5] memory rValues = _getRValues(amount, tValues, _getRate());
+        uint256 currentRate = _getRate();
+        uint256[5] memory rValues = _getRValues(amount, tValues, currentRate);
         return (tValues, rValues);
     }
     // function _getValues(uint256 amount) private view returns (uint256[5] memory, uint256[4] memory) {
@@ -490,7 +491,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
 
     function _getRate() private view returns(uint256) {
         (uint256 rSupply, uint256 tSupply) = _getCurrentSupply();
-        return rSupply.div(tSupply);
+        return rSupply / tSupply;
     }
 
     function _getCurrentSupply() private view returns(uint256, uint256) {
@@ -501,7 +502,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
             rSupply = rSupply - _rBalances[_excludedFromReward[i]];
             tSupply = tSupply - _tBalances[_excludedFromReward[i]];
         }
-        if (rSupply < _rTotal.div(_totalSupply)) return (_rTotal, _totalSupply);
+        if (rSupply < _rTotal / _totalSupply) return (_rTotal, _totalSupply);
         return (rSupply, tSupply);
     }
 
