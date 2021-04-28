@@ -48,7 +48,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         _symbol = symbol_;
         _decimals = decimals_;
         _totalSupply = totalSupply_ * (10**decimals_);
-        _currentSupply = totalSupply_;
+        _currentSupply = _totalSupply;
         _rTotal = (~uint256(0) - (~uint256(0) % _totalSupply));
 
         // mint
@@ -110,6 +110,10 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
      */
     function totalSupply() public view virtual override returns (uint256) {
         return _totalSupply;
+    }
+
+    function currentSupply() public view virtual returns (uint256) {
+        return _currentSupply;
     }
 
     /**
@@ -240,11 +244,13 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         _rBalances[burnAccount] += rAmount;
 
         // decrease the total coin supply
-        _totalSupply -= amount;
+        //_totalSupply -= amount;
+        _currentSupply -= amount;
 
         // todo: update _rTotal
 
         emit Burn(account, amount);
+        emit Transfer(account, burnAccount, amount);
     }
    
     /**
