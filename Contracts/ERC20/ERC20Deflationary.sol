@@ -2,16 +2,13 @@
 
 pragma solidity ^0.8.0;
 
-import "../Utils/Context.sol";
-import "../Utils/SafeMath.sol";
-import "../Utils/Counters.sol";
 import "../Utils/Address.sol";
+import "../Utils/Context.sol";
 import "../Utils/Ownable.sol";
 import "./IERC20.sol";
 
 
 contract ERC20Deflationary is Context, IERC20, Ownable {
-    using SafeMath for uint256;
     using Address for address;
 
     // balances for address that are included.
