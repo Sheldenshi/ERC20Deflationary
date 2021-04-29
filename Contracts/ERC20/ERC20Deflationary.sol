@@ -87,9 +87,9 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         uint256 tokensAddedToLiquidity
     );
     event ExcludeAccountFromReward(address account);
-    event IncludeAccountFromReward(address account);
+    event IncludeAccountInReward(address account);
     event ExcludeAccountFromFee(address account);
-    event IncludeAccountFromFee(address account);
+    event IncludeAccountInFee(address account);
     event MinTokensBeforeSwapUpdated(uint256 previous, uint256 current);
     event EnabledAutoBurn(uint8 taxBurn_);
     event EnabledReward(uint taxReward_);
@@ -121,16 +121,10 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         _excludeFromFee(owner());
         _excludeFromFee(address(this));
 
-        emit ExcludeAccountFromFee(owner());
-        emit ExcludeAccountFromFee(address(this));
         // exclude owner, burnAccount, and this contract from receiving rewards.
         excludeAccountFromReward(owner());
         excludeAccountFromReward(burnAccount);
         excludeAccountFromReward(address(this));
-
-        emit ExcludeAccountFromReward(owner());
-        emit ExcludeAccountFromReward(burnAccount);
-        emit ExcludeAccountFromReward(address(this));
         
         emit Transfer(address(0), _msgSender(), _totalSupply);
     }
@@ -730,10 +724,14 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
 
     function _excludeFromFee(address account) private onlyOwner {
         _isExcludedFromFee[account] = true;
+
+        emit ExcludeAccountFromFee(account);
     }
 
     function _includeInFee(address account) private onlyOwner {
         _isExcludedFromFee[account] = false;
+        
+        emit IncludeAccountInFee(account);
     }
 
     function excludeAccountFromReward(address account) public onlyOwner {
@@ -743,6 +741,8 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         }
         _isExcludedFromReward[account] = true;
         _excludedFromReward.push(account);
+        
+        emit ExcludeAccountFromReward(account);
     }
 
     function includeAccountFromReward(address account) public onlyOwner {
@@ -756,6 +756,8 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
                 break;
             }
         }
+
+        emit IncludeAccountInReward(account);
     }
     
 
