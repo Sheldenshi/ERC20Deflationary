@@ -1,8 +1,8 @@
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.4;
 
 // for more info: https://uniswap.org/docs/v2/smart-contracts/router01/
 
-interface PancakeSwapV2Router01 {
+interface IUniswapV2Router01 {
   function factory() external pure returns (address);
   function WETH() external pure returns (address);
 

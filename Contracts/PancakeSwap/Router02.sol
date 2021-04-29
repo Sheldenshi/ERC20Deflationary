@@ -1,10 +1,10 @@
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.4;
 
 // for more info: https://uniswap.org/docs/v2/smart-contracts/router02/
 
 import "./Router01.sol";
 
-interface PancakeSwapV2Router02 is PancakeSwapV2Router01 {
+interface IUniswapV2Router02 is IUniswapV2Router01 {
     function removeLiquidityETHSupportingFeeOnTransferTokens(
         address token,
         uint liquidity,
