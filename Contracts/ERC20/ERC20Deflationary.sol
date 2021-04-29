@@ -709,6 +709,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     }
 
     function setTaxReward(uint8 taxReward_) public onlyOwner {
+        require(_rewardEnabled, "Reward feature must be enabled. Try the EnableReward function.");
         require(_taxBurn + taxReward_ + _taxLiquidity < 100, "Tax fee too high.");
         uint8 previous = _taxReward;
         _taxReward = taxReward_;
@@ -716,6 +717,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     }
 
     function setTaxLiquidity(uint8 taxLiquidity_) public onlyOwner {
+        require(_autoSwapAndLiquifyEnabled, "Auto swap and liquify feature must be enabled. Try the EnableAutoSwapAndLiquify function.");
         require(_taxBurn + _taxReward + taxLiquidity_ < 100, "Tax fee too high.");
         uint8 previous = _taxLiquidity;
         _taxLiquidity = taxLiquidity_;
