@@ -37,6 +37,9 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     uint256 private _rTotal;
     uint256 private _tFeeTotal;
 
+    // swap and liquify every million tokens
+    uint256 private _minTokensBeforeSwap = 10000000;
+
     string private _name;
     string private _symbol;
 
@@ -45,6 +48,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     address public immutable uniswapV2Pair;
 
     bool inSwapAndLiquify;
+    bool liquifyEnabled;
         
     modifier lockTheSwap {
         require(!inSwapAndLiquify, "Currently in swap and liquify.");
@@ -72,7 +76,11 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     event TaxBurnUpdate(uint8 previous, uint8 current);
     event TaxRewardUpdate(uint8 previous, uint8 current);
     event TaxLiquidityUpdate(uint8 previous, uint8 current);
-
+    event SwapAndLiquify(
+        uint256 tokensSwapped,
+        uint256 ethReceived,
+        uint256 tokensAddedToLiquidity
+    );
     
 
     constructor (string memory name_, string memory symbol_, uint8 decimals_, uint256 totalSupply_) {
@@ -147,6 +155,9 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
 
     function taxLiquidity() public view virtual returns (uint8) {
         return _taxLiquidity;
+    }
+    function minTokensBeforeSwap() public view virtual returns (uint256) {
+        return _minTokensBeforeSwap;
     }
 
     /**
@@ -398,6 +409,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         emit Approval(owner, spender, amount);
     }
 
+
     function _transfer(address sender, address recipient, uint256 amount) private {
         require(sender != address(0), "ERC20: transfer from the zero address");
         require(recipient != address(0), "ERC20: transfer to the zero address");
@@ -435,8 +447,25 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         
         // reflect
         _distributeFee(values.rRewardFee, values.tRewardFee);
+        
+        // add to liquidity
 
-        // todo: add liquidity
+        // add liquidity fee to this contract.
+        _tBalances[address(this)] += values.tLiquidityFee;
+
+        uint256 contractBalance = balanceOf(address(this));
+
+        // whether the current contract balances makes the threshold to swap and liquify.
+        bool overMinTokensBeforeSwap = contractBalance >= _minTokensBeforeSwap;
+
+        if (overMinTokensBeforeSwap &&
+            !inSwapAndLiquify &&
+            msg.sender != uniswapV2Pair &&
+            liquifyEnabled
+            ) 
+        {
+            swapAndLiquify(contractBalance);
+        }
      }
 
     
@@ -486,6 +515,55 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         emit Transfer(sender, recipient, values.tTransferAmount);
     }
 
+    function swapAndLiquify(uint256 contractBalance) private lockTheSwap {
+        // split the contract balance into two halves.
+        uint256 tokensToSwap = contractBalance / 2;
+        uint256 tokensAddToLiquidity = contractBalance - tokensToSwap;
+
+        // contract's current ETH balance.
+        uint256 initialBalance = address(this).balance;
+
+        // swap half of the tokens to ETH.
+        swapTokensForEth(tokensToSwap);
+
+        uint256 ethAddToLiquify = address(this).balance - initialBalance;
+
+        addLiquidity(ethAddToLiquify, tokensAddToLiquidity);
+
+        emit SwapAndLiquify(tokensToSwap, ethAddToLiquify, tokensAddToLiquidity);
+    }
+
+    function swapTokensForEth(uint256 amount) private {
+        // generate the uniswap pair path of token -> weth
+        address[] memory path = new address[](2);
+        path[0] = address(this);
+        path[1] = uniswapV2Router.WETH();
+
+        _approve(address(this), address(uniswapV2Router), amount);
+
+
+        // swap tokens to eth
+        uniswapV2Router.swapExactTokensForETHSupportingFeeOnTransferTokens(
+            amount, 
+            0, 
+            path, 
+            address(this), 
+            block.timestamp
+            );
+    }
+    function addLiquidity(uint256 ethAmount, uint256 tokenAmount) private {
+        _approve(address(this), address(uniswapV2Router), tokenAmount);
+
+        // add the liquidity
+        uniswapV2Router.addLiquidityETH{value: ethAmount}(
+            address(this), 
+            tokenAmount, 
+            0, // slippage is unavoidable
+            0, // slippage is unavoidable
+            address(this), 
+            block.timestamp
+        );
+    }
     function _distributeFee(uint256 rFee, uint256 tFee) private {
         // to decrease rate thus increase amount reward receive.
         _rTotal = _rTotal - rFee;
@@ -561,6 +639,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         require(taxBurn_ + _taxReward + _taxLiquidity < 100, "Tax fee too high.");
         _taxBurn = taxBurn_;
     }
+
 
     function setTaxReward(uint8 taxReward_) public onlyOwner {
         require(_taxBurn + taxReward_ + _taxLiquidity < 100, "Tax fee too high.");
