@@ -23,8 +23,9 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
 
 
     // liquidity pool provider router
-    IUniswapV2Router02 public immutable uniswapV2Router;
-    address public immutable uniswapV2Pair;
+    IUniswapV2Router02 public uniswapV2Router;
+    address public uniswapV2Pair;
+
     address private constant burnAccount = 0x000000000000000000000000000000000000dEaD;
 
     address[] private _excludedFromReward;
@@ -49,14 +50,16 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
 
     
 
-    bool inSwapAndLiquify;
-    bool liquifyEnabled;
+    bool private _inSwapAndLiquify;
+    bool private _autoSwapAndLiquifyEnabled;
+    bool private _autoBurnEnabled;
+    bool private _rewardEnabled;
         
     modifier lockTheSwap {
-        require(!inSwapAndLiquify, "Currently in swap and liquify.");
-        inSwapAndLiquify = true;
+        require(!_inSwapAndLiquify, "Currently in swap and liquify.");
+        _inSwapAndLiquify = true;
         _;
-        inSwapAndLiquify = false;
+        _inSwapAndLiquify = false;
     }
 
     struct ValuesFromAmount {
@@ -87,6 +90,16 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     event IncludeAccountFromReward(address account);
     event ExcludeAccountFromFee(address account);
     event IncludeAccountFromFee(address account);
+    event MinTokensBeforeSwapUpdated(uint256 previous, uint256 current);
+    event EnabledAutoBurn(uint8 taxBurn_);
+    event EnabledReward(uint taxReward_);
+    event EnabledAutoSwapAndLiquify(uint8 taxLiquidity_);
+    event DisabledAutoBurn();
+    event DisabledReward();
+    event DisabledAutoSwapAndLiquify();
+
+
+    
     
 
     constructor (string memory name_, string memory symbol_, uint8 decimals_, uint256 totalSupply_) {
@@ -101,14 +114,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         // mint
         _rBalances[_msgSender()] = _rTotal;
 
-        // pancakeswap test router
-        IUniswapV2Router02 _uniswapV2Router = IUniswapV2Router02(0x73D58041eDdD468e016Cfbc13f3BDc4248cCD65D);
-
-        uniswapV2Pair = IUniswapV2Factory(_uniswapV2Router.factory())
-            .createPair(address(this), _uniswapV2Router.WETH());
-
-        // set the rest of the contract variables
-        uniswapV2Router = _uniswapV2Router;
+        
         
         
         // exclude owner and this contract from fee.
@@ -427,29 +433,38 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
      */
     function _afterTokenTransfer(ValuesFromAmount memory values) internal virtual {
         // burn from contract address
-        burn(values.tBurnFee);
+        if (_autoBurnEnabled) {
+            burn(values.tBurnFee);
+        }   
+        
         
         // reflect
-        _distributeFee(values.rRewardFee, values.tRewardFee);
+        if (_rewardEnabled) {
+            _distributeFee(values.rRewardFee, values.tRewardFee);
+        }
+        
         
         // add to liquidity
+        
+        if (_autoSwapAndLiquifyEnabled) {
+            // add liquidity fee to this contract.
+            _tBalances[address(this)] += values.tLiquidityFee;
 
-        // add liquidity fee to this contract.
-        _tBalances[address(this)] += values.tLiquidityFee;
+            uint256 contractBalance = balanceOf(address(this));
 
-        uint256 contractBalance = balanceOf(address(this));
+            // whether the current contract balances makes the threshold to swap and liquify.
+            bool overMinTokensBeforeSwap = contractBalance >= _minTokensBeforeSwap;
 
-        // whether the current contract balances makes the threshold to swap and liquify.
-        bool overMinTokensBeforeSwap = contractBalance >= _minTokensBeforeSwap;
-
-        if (overMinTokensBeforeSwap &&
-            !inSwapAndLiquify &&
-            msg.sender != uniswapV2Pair &&
-            liquifyEnabled
-            ) 
-        {
-            swapAndLiquify(contractBalance);
+            if (overMinTokensBeforeSwap &&
+                !_inSwapAndLiquify &&
+                msg.sender != uniswapV2Pair &&
+                _autoSwapAndLiquifyEnabled
+                ) 
+            {
+                swapAndLiquify(contractBalance);
+            }
         }
+        
      }
 
     
@@ -623,10 +638,76 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         return amount * taxRate / (10**2);
     }
 
+
     /*
         Owner functions
     */
+    function enableAutoBurn(uint8 taxBurn_) public onlyOwner {
+        require(!_autoBurnEnabled, "Auto burn feature is already enabled.");
+        setTaxBurn(taxBurn_);
+        _autoBurnEnabled = true;
+        
+        emit EnabledAutoBurn(taxBurn_);
+    }
+
+    function enableReward(uint8 taxReward_) public onlyOwner {
+        require(!_rewardEnabled, "Reward feature is already enabled.");
+        setTaxReward(taxReward_);
+        _rewardEnabled = true;
+        
+        emit EnabledReward(taxReward_);
+    }
+
+    function enableAutoSwapAndLiquify(uint8 taxLiquidity_, address routerAddress) public onlyOwner {
+        require(!_autoSwapAndLiquifyEnabled, "Auto swap and liquify feature is already enabled.");
+
+        // init Router
+        IUniswapV2Router02 _uniswapV2Router = IUniswapV2Router02(routerAddress);
+
+        uniswapV2Pair = IUniswapV2Factory(_uniswapV2Router.factory())
+            .createPair(address(this), _uniswapV2Router.WETH());
+
+        uniswapV2Router = _uniswapV2Router;
+
+        // enable
+        setTaxLiquidity(taxLiquidity_);
+        _autoSwapAndLiquifyEnabled = true;
+        
+        
+        emit EnabledAutoSwapAndLiquify(taxLiquidity_);
+    }
+
+
+    function disableAutoBurn() public onlyOwner {
+        require(_autoBurnEnabled, "Auto burn feature is already disabled.");
+        setTaxBurn(0);
+        _autoBurnEnabled = false;
+        
+        
+        emit DisabledAutoBurn();
+    }
+
+    function disableReward() public onlyOwner {
+        require(_rewardEnabled, "Reward feature is already disabled.");
+        setTaxReward(0);
+        _rewardEnabled = false;
+        
+        
+        emit DisabledReward();
+    }
+
+    function disableAutoSwapAndLiquify() public onlyOwner {
+        require(_autoSwapAndLiquifyEnabled, "Auto swap and liquify feature is already disabled.");
+        setTaxLiquidity(0);
+        _autoSwapAndLiquifyEnabled = false;
+        
+        
+        emit DisabledAutoSwapAndLiquify();
+    }
+
+    
     function setTaxBurn(uint8 taxBurn_) public onlyOwner {
+        require(_autoBurnEnabled, "Auto burn feature must be enabled. Try the EnableAutoBurn function.");
         require(taxBurn_ + _taxReward + _taxLiquidity < 100, "Tax fee too high.");
         uint8 previous = _taxBurn;
         _taxBurn = taxBurn_;
