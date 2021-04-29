@@ -16,25 +16,40 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
 
     mapping (address => bool) private _isExcludedFromFee;
     mapping (address => bool) private _isExcludedFromReward;
+
+    address private constant burnAccount = 0x000000000000000000000000000000000000dEaD;
+
     address[] private _excludedFromReward;
    
+   // this percent of transaction amount that will be burnt.
+    uint8 private _taxBurn;
+    // percent of transaction amount that will be redistribute to all holders.
+    uint8 private _taxReward;
+    // percent of transaction amount that will be added to the liquidity pool
+    uint8 private _taxLiquidity; 
     uint8 private immutable _decimals;
     uint256 private  _totalSupply;
     uint256 private _currentSupply;
     uint256 private _rTotal;
     uint256 private _tFeeTotal;
 
-    // this percent of transaction amount that will be burnt.
-    uint8 private _taxFeeBurn;
-    // percent of transaction amount that will be redistribute to all holders.
-    uint8 private _taxFeeReward;
-    // percent of transaction amount that will be added to the liquidity pool
-    uint8 private _taxFeeLiquidity; 
-
     string private _name;
     string private _symbol;
 
-    address private constant burnAccount = 0x000000000000000000000000000000000000dEaD;
+    struct ValuesFromAmount {
+        uint256 amount;
+        uint256 tBurnFee;
+        uint256 tRewardFee;
+        uint256 tLiquidityFee;
+        // amount after fee
+        uint256 tTransferAmount;
+
+        uint256 rAmount;
+        uint256 rBurnFee;
+        uint256 rRewardFee;
+        uint256 rLiquidityFee;
+        uint256 rTransferAmount;
+    }
 
     event Burn(address from, uint256 amount);
 
@@ -91,16 +106,16 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         return _decimals;
     }
 
-    function taxFeeBurn() public view virtual returns (uint8) {
-        return _taxFeeBurn;
+    function taxBurn() public view virtual returns (uint8) {
+        return _taxBurn;
     }
 
-    function taxFeeReward() public view virtual returns (uint8) {
-        return _taxFeeReward;
+    function taxReward() public view virtual returns (uint8) {
+        return _taxReward;
     }
 
-    function taxFeeLiquidity() public view virtual returns (uint8) {
-        return _taxFeeLiquidity;
+    function taxLiquidity() public view virtual returns (uint8) {
+        return _taxLiquidity;
     }
 
     /**
@@ -446,20 +461,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         _tFeeTotal = _tFeeTotal + tFee;
     }
     
-    struct ValuesFromAmount {
-        uint256 amount;
-        uint256 tBurnFee;
-        uint256 tRewardFee;
-        uint256 tLiquidityFee;
-        // amount after fee
-        uint256 tTransferAmount;
-
-        uint256 rAmount;
-        uint256 rBurnFee;
-        uint256 rRewardFee;
-        uint256 rLiquidityFee;
-        uint256 rTransferAmount;
-    }
+    
    
     function _getValues(uint256 amount, bool deductTransferFee) private view returns (ValuesFromAmount memory) {
         ValuesFromAmount memory values;
@@ -475,9 +477,9 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
             values.tTransferAmount = values.amount;
         } else {
             // calculate fee
-            values.tBurnFee = _calculateTaxFeeBurn(values.amount);
-            values.tRewardFee = _calculateTaxFeeReward(values.amount);
-            values.tLiquidityFee = _calculateTaxFeeLiquidity(values.amount);
+            values.tBurnFee = _calculateTax(values.amount, _taxBurn);
+            values.tRewardFee = _calculateTax(values.amount, _taxReward);
+            values.tLiquidityFee = _calculateTax(values.amount, _taxLiquidity);
             
             // amount after fee
             values.tTransferAmount = values.amount - values.tBurnFee - values.tRewardFee - values.tLiquidityFee;
@@ -525,30 +527,22 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     }
 
     function setTaxFeeBurn(uint8 taxFeeBurn_) public onlyOwner {
-        require(taxFeeBurn_ + _taxFeeReward + _taxFeeLiquidity < 100, "Tax fee too high.");
-        _taxFeeBurn = taxFeeBurn_;
+        require(taxFeeBurn_ + _taxReward + _taxLiquidity < 100, "Tax fee too high.");
+        _taxBurn = taxFeeBurn_;
     }
 
     function setTaxFeeReward(uint8 taxFeeReward_) public onlyOwner {
-        require(_taxFeeBurn + taxFeeReward_ + _taxFeeLiquidity < 100, "Tax fee too high.");
-        _taxFeeReward = taxFeeReward_;
+        require(_taxBurn + taxFeeReward_ + _taxLiquidity < 100, "Tax fee too high.");
+        _taxReward = taxFeeReward_;
     }
 
     function setTaxFeeLiquidity(uint8 taxFeeLiquidity_) public onlyOwner {
-        require(_taxFeeBurn + _taxFeeReward + taxFeeLiquidity_ < 100, "Tax fee too high.");
-        _taxFeeLiquidity = taxFeeLiquidity_;
+        require(_taxBurn + _taxReward + taxFeeLiquidity_ < 100, "Tax fee too high.");
+        _taxLiquidity = taxFeeLiquidity_;
     }
 
-    function _calculateTaxFeeBurn(uint256 amount) private view returns (uint256) {
-        return amount * _taxFeeBurn / (10**2);
-    }
-
-    function _calculateTaxFeeReward(uint256 amount) private view returns (uint256) {
-        return amount * _taxFeeReward / (10**2);
-    } 
-
-    function _calculateTaxFeeLiquidity(uint256 amount) private view returns (uint256) {
-        return amount * _taxFeeLiquidity / (10**2);
+    function _calculateTax(uint256 amount, uint8 taxRate) private pure returns (uint256) {
+        return amount * taxRate / (10**2);
     }
 
 }
