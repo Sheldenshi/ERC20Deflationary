@@ -5,10 +5,10 @@ pragma solidity ^0.8.4;
 import "../Utils/Context.sol";
 import "../Utils/Ownable.sol";
 import "./IERC20.sol";
-import "../Pancakeswap/Factory.sol";
-import "../Pancakeswap/Pair.sol";
-import "../Pancakeswap/Router01.sol";
-import "../Pancakeswap/Router02.sol";
+import "../Pancakeswap/IFactory.sol";
+import "../Pancakeswap/IPair.sol";
+import "../Pancakeswap/IRouter01.sol";
+import "../Pancakeswap/IRouter02.sol";
 
 
 contract ERC20Deflationary is Context, IERC20, Ownable {
@@ -40,6 +40,19 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     string private _name;
     string private _symbol;
 
+    // liquidity pool provider router
+    IUniswapV2Router02 public immutable uniswapV2Router;
+    address public immutable uniswapV2Pair;
+
+    bool inSwapAndLiquify;
+        
+    modifier lockTheSwap {
+        require(!inSwapAndLiquify, "Currently in swap and liquify.");
+        inSwapAndLiquify = true;
+        _;
+        inSwapAndLiquify = false;
+    }
+
     struct ValuesFromAmount {
         uint256 amount;
         uint256 tBurnFee;
@@ -56,6 +69,9 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     }
 
     event Burn(address from, uint256 amount);
+    event TaxBurnUpdate(uint8 previous, uint8 current);
+    event TaxRewardUpdate(uint8 previous, uint8 current);
+    event TaxLiquidityUpdate(uint8 previous, uint8 current);
 
     
 
@@ -71,13 +87,24 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         // mint
         _rBalances[_msgSender()] = _rTotal;
 
+        // pancakeswap test router
+        IUniswapV2Router02 _uniswapV2Router = IUniswapV2Router02(0x73D58041eDdD468e016Cfbc13f3BDc4248cCD65D);
+
+        uniswapV2Pair = IUniswapV2Factory(_uniswapV2Router.factory())
+            .createPair(address(this), _uniswapV2Router.WETH());
+
+        // set the rest of the contract variables
+        uniswapV2Router = _uniswapV2Router;
+        
+        
         // exclude owner and this contract from fee.
         _excludeFromFee(owner());
         _excludeFromFee(address(this));
 
-        // exclude owner and burnAccount from receiving rewards.
+        // exclude owner, burnAccount, and this contract from receiving rewards.
         excludeAccountFromReward(owner());
         excludeAccountFromReward(burnAccount);
+        excludeAccountFromReward(address(this));
         
         emit Transfer(address(0), _msgSender(), _totalSupply);
     }
