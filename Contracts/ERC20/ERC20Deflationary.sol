@@ -249,8 +249,6 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         //_totalSupply -= amount;
         _currentSupply -= amount;
 
-        // todo: update _rTotal
-
         emit Burn(account, amount);
         emit Transfer(account, burnAccount, amount);
     }
@@ -290,8 +288,6 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     }
 
     // todo: figure out what this does.
-    // tValues = uint256 tTransferAmount, uint256 tBurnFee, uint256 tRewardFee, uint256 tLiquidityFee
-    // rValues = uint256 rAmount, uint256 rTransferAmount, uint256 rBurnFee, uint256 rRewardFee, uint256 rLiquidityFee
     function reflect(uint256 amount) public {
         address sender = _msgSender();
         require(!_isExcludedFromReward[sender], "Excluded addresses cannot call this function");
@@ -388,7 +384,8 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         rValues = uint256 rAmount, uint256 rTransferAmount, uint256 rBurnFee, uint256 rRewardFee, uint256 rLiquidityFee;
      */
     function _afterTokenTransfer(ValuesFromAmount memory values) internal virtual {
-        // todo: burn 
+        // burn from contract address
+        burnFrom(address(this), values.tBurnFee);
         
         // reflect
         _distributeFee(values.rRewardFee, values.tRewardFee);
@@ -396,8 +393,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         // todo: add liquidity
      }
 
-    // tValues = (uint256 tTransferAmount, uint256 tBurnFee, uint256 tRewardFee, uint256 tLiquidityFee);
-    // rValues = uint256 rAmount, uint256 rTransferAmount, uint256 rBurnFee, uint256 rRewardFee, uint256 rLiquidityFee;
+    
     function _transferStandard(address sender, address recipient, uint256 amount) private {
         ValuesFromAmount memory values = _getValues(amount);
     
@@ -409,8 +405,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         emit Transfer(sender, recipient, values.tTransferAmount);
     }
 
-    // tValues = (uint256 tTransferAmount, uint256 tBurnFee, uint256 tRewardFee, uint256 tLiquidityFee);
-    // rValues = uint256 rAmount, uint256 rTransferAmount, uint256 rBurnFee, uint256 rRewardFee, uint256 rLiquidityFee;
+    
     function _transferToExcluded(address sender, address recipient, uint256 amount) private {
         ValuesFromAmount memory values = _getValues(amount);
         
@@ -423,8 +418,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         emit Transfer(sender, recipient, values.tTransferAmount);
     }
 
-    // tValues = (uint256 tTransferAmount, uint256 tBurnFee, uint256 tRewardFee, uint256 tLiquidityFee);
-    // rValues = uint256 rAmount, uint256 rTransferAmount, uint256 rBurnFee, uint256 rRewardFee, uint256 rLiquidityFee;
+    
     function _transferFromExcluded(address sender, address recipient, uint256 amount) private {
         ValuesFromAmount memory values = _getValues(amount);
         
@@ -437,8 +431,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         emit Transfer(sender, recipient, values.tTransferAmount);
     }
 
-    // tValues = (uint256 tTransferAmount, uint256 tBurnFee, uint256 tRewardFee, uint256 tLiquidityFee);
-    // rValues = uint256 rAmount, uint256 rTransferAmount, uint256 rBurnFee, uint256 rRewardFee, uint256 rLiquidityFee;
+    
     function _transferBothExcluded(address sender, address recipient, uint256 amount) private {
         ValuesFromAmount memory values = _getValues(amount);
 
@@ -480,11 +473,6 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         _getRValues(values);
         return values;
     }
-    // function _getValues(uint256 amount) private view returns (uint256[5] memory, uint256[4] memory) {
-    //     (uint256 tTransferAmount, uint256 tBurnFee, uint256 tRewardFee, uint256 tLiquidityFee) = _getTValues(amount);
-    //     (uint256 rAmount, uint256 rTransferAmount, uint256 rBurnFee, uint256 rRewardFee, uint256 rLiquidityFee) = _getRValues(amount, tBurnFee, tRewardFee, tLiquidityFee, _getRate());
-    //     return ([rAmount, rTransferAmount, rBurnFee, rRewardFee, rLiquidityFee], [tTransferAmount, tBurnFee, tRewardFee, tLiquidityFee]);
-    // }
 
     function _getTValues(ValuesFromAmount memory values) view private {
         
@@ -497,8 +485,6 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         values.tTransferAmount = values.amount - values.tBurnFee - values.tRewardFee - values.tLiquidityFee;
     }
 
-    // tValues = (uint256 tTransferAmount, uint256 tBurnFee, uint256 tRewardFee, uint256 tLiquidityFee);
-    // rValues = uint256 rAmount, uint256 rTransferAmount, uint256 rBurnFee, uint256 rRewardFee, uint256 rLiquidityFee;
     function _getRValues(ValuesFromAmount memory values) view private {
         uint256 currentRate = _getRate();
         values.rAmount = values.amount * currentRate;
