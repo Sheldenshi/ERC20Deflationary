@@ -12,6 +12,11 @@ Feel free to submit an issue or pull request :)
 
 
 ## How to use:
+
+Clone this git repo and import ERC20Deflationary.sol
+
+Example:
+
 ```
 pragma solidity ^0.8.4;
 
