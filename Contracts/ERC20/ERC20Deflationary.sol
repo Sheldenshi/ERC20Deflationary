@@ -21,6 +21,10 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     mapping (address => bool) private _isExcludedFromFee;
     mapping (address => bool) private _isExcludedFromReward;
 
+
+    // liquidity pool provider router
+    IUniswapV2Router02 public immutable uniswapV2Router;
+    address public immutable uniswapV2Pair;
     address private constant burnAccount = 0x000000000000000000000000000000000000dEaD;
 
     address[] private _excludedFromReward;
@@ -43,9 +47,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     string private _name;
     string private _symbol;
 
-    // liquidity pool provider router
-    IUniswapV2Router02 public immutable uniswapV2Router;
-    address public immutable uniswapV2Pair;
+    
 
     bool inSwapAndLiquify;
     bool liquifyEnabled;
@@ -81,6 +83,10 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         uint256 ethReceived,
         uint256 tokensAddedToLiquidity
     );
+    event ExcludeAccountFromReward(address account);
+    event IncludeAccountFromReward(address account);
+    event ExcludeAccountFromFee(address account);
+    event IncludeAccountFromFee(address account);
     
 
     constructor (string memory name_, string memory symbol_, uint8 decimals_, uint256 totalSupply_) {
@@ -109,10 +115,16 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         _excludeFromFee(owner());
         _excludeFromFee(address(this));
 
+        emit ExcludeAccountFromFee(owner());
+        emit ExcludeAccountFromFee(address(this));
         // exclude owner, burnAccount, and this contract from receiving rewards.
         excludeAccountFromReward(owner());
         excludeAccountFromReward(burnAccount);
         excludeAccountFromReward(address(this));
+
+        emit ExcludeAccountFromReward(owner());
+        emit ExcludeAccountFromReward(burnAccount);
+        emit ExcludeAccountFromReward(address(this));
         
         emit Transfer(address(0), _msgSender(), _totalSupply);
     }
@@ -371,35 +383,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     }
 
     
-    function _excludeFromFee(address account) private onlyOwner {
-        _isExcludedFromFee[account] = true;
-    }
-
-    function _includeInFee(address account) private onlyOwner {
-        _isExcludedFromFee[account] = false;
-    }
-
-    function excludeAccountFromReward(address account) public onlyOwner {
-        require(!_isExcludedFromReward[account], "Account is already excluded");
-        if(_rBalances[account] > 0) {
-            _tBalances[account] = tokenFromReflection(_rBalances[account]);
-        }
-        _isExcludedFromReward[account] = true;
-        _excludedFromReward.push(account);
-    }
-
-    function includeAccountFromReward(address account) public onlyOwner {
-        require(_isExcludedFromReward[account], "Account is already included");
-        for (uint256 i = 0; i < _excludedFromReward.length; i++) {
-            if (_excludedFromReward[i] == account) {
-                _excludedFromReward[i] = _excludedFromReward[_excludedFromReward.length - 1];
-                _tBalances[account] = 0;
-                _isExcludedFromReward[account] = false;
-                _excludedFromReward.pop();
-                break;
-            }
-        }
-    }
+    
 
     function _approve(address owner, address spender, uint256 amount) private {
         require(owner != address(0), "ERC20: approve from the zero address");
@@ -515,6 +499,8 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         emit Transfer(sender, recipient, values.tTransferAmount);
     }
 
+    receive() external payable {}
+
     function swapAndLiquify(uint256 contractBalance) private lockTheSwap {
         // split the contract balance into two halves.
         uint256 tokensToSwap = contractBalance / 2;
@@ -570,8 +556,6 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         _tFeeTotal = _tFeeTotal + tFee;
     }
     
-    
-   
     function _getValues(uint256 amount, bool deductTransferFee) private view returns (ValuesFromAmount memory) {
         ValuesFromAmount memory values;
         values.amount = amount;
@@ -635,24 +619,63 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         return (rSupply, tSupply);
     }
 
-    function setTaxBurn(uint8 taxBurn_) public onlyOwner {
-        require(taxBurn_ + _taxReward + _taxLiquidity < 100, "Tax fee too high.");
-        _taxBurn = taxBurn_;
+    function _calculateTax(uint256 amount, uint8 taxRate) private pure returns (uint256) {
+        return amount * taxRate / (10**2);
     }
 
+    /*
+        Owner functions
+    */
+    function setTaxBurn(uint8 taxBurn_) public onlyOwner {
+        require(taxBurn_ + _taxReward + _taxLiquidity < 100, "Tax fee too high.");
+        uint8 previous = _taxBurn;
+        _taxBurn = taxBurn_;
+        emit TaxBurnUpdate(previous, _taxBurn);
+    }
 
     function setTaxReward(uint8 taxReward_) public onlyOwner {
         require(_taxBurn + taxReward_ + _taxLiquidity < 100, "Tax fee too high.");
+        uint8 previous = _taxReward;
         _taxReward = taxReward_;
+        emit TaxRewardUpdate(previous, _taxReward);
     }
 
     function setTaxLiquidity(uint8 taxLiquidity_) public onlyOwner {
         require(_taxBurn + _taxReward + taxLiquidity_ < 100, "Tax fee too high.");
+        uint8 previous = _taxLiquidity;
         _taxLiquidity = taxLiquidity_;
+        emit TaxLiquidityUpdate(previous, _taxLiquidity);
     }
 
-    function _calculateTax(uint256 amount, uint8 taxRate) private pure returns (uint256) {
-        return amount * taxRate / (10**2);
+    function _excludeFromFee(address account) private onlyOwner {
+        _isExcludedFromFee[account] = true;
     }
+
+    function _includeInFee(address account) private onlyOwner {
+        _isExcludedFromFee[account] = false;
+    }
+
+    function excludeAccountFromReward(address account) public onlyOwner {
+        require(!_isExcludedFromReward[account], "Account is already excluded");
+        if(_rBalances[account] > 0) {
+            _tBalances[account] = tokenFromReflection(_rBalances[account]);
+        }
+        _isExcludedFromReward[account] = true;
+        _excludedFromReward.push(account);
+    }
+
+    function includeAccountFromReward(address account) public onlyOwner {
+        require(_isExcludedFromReward[account], "Account is already included");
+        for (uint256 i = 0; i < _excludedFromReward.length; i++) {
+            if (_excludedFromReward[i] == account) {
+                _excludedFromReward[i] = _excludedFromReward[_excludedFromReward.length - 1];
+                _tBalances[account] = 0;
+                _isExcludedFromReward[account] = false;
+                _excludedFromReward.pop();
+                break;
+            }
+        }
+    }
+    
 
 }
