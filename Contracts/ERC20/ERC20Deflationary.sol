@@ -361,17 +361,22 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         require(recipient != address(0), "ERC20: transfer to the zero address");
         require(amount > 0, "Transfer amount must be greater than zero");
 
+        ValuesFromAmount memory values = _getValues(amount);
+
         if (_isExcludedFromReward[sender] && !_isExcludedFromReward[recipient]) {
-            _transferFromExcluded(sender, recipient, amount);
+            _transferFromExcluded(sender, recipient, values);
         } else if (!_isExcludedFromReward[sender] && _isExcludedFromReward[recipient]) {
-            _transferToExcluded(sender, recipient, amount);
+            _transferToExcluded(sender, recipient, values);
         } else if (!_isExcludedFromReward[sender] && !_isExcludedFromReward[recipient]) {
-            _transferStandard(sender, recipient, amount);
+            _transferStandard(sender, recipient, values);
         } else if (_isExcludedFromReward[sender] && _isExcludedFromReward[recipient]) {
-            _transferBothExcluded(sender, recipient, amount);
+            _transferBothExcluded(sender, recipient, values);
         } else {
-            _transferStandard(sender, recipient, amount);
+            _transferStandard(sender, recipient, values);
         }
+
+        _afterTokenTransfer(values);
+
     }
 
 
@@ -394,20 +399,17 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
      }
 
     
-    function _transferStandard(address sender, address recipient, uint256 amount) private {
-        ValuesFromAmount memory values = _getValues(amount);
+    function _transferStandard(address sender, address recipient, ValuesFromAmount memory values) private {
+        
     
         _rBalances[sender] = _rBalances[sender] - values.rAmount;
         _rBalances[recipient] = _rBalances[recipient] + values.rTransferAmount;   
-        
-        _afterTokenTransfer(values);
 
         emit Transfer(sender, recipient, values.tTransferAmount);
     }
 
     
-    function _transferToExcluded(address sender, address recipient, uint256 amount) private {
-        ValuesFromAmount memory values = _getValues(amount);
+    function _transferToExcluded(address sender, address recipient, ValuesFromAmount memory values) private {
         
         _rBalances[sender] = _rBalances[sender] - values.rAmount;
         _tBalances[recipient] = _tBalances[recipient] + values.tTransferAmount;
@@ -419,10 +421,9 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     }
 
     
-    function _transferFromExcluded(address sender, address recipient, uint256 amount) private {
-        ValuesFromAmount memory values = _getValues(amount);
+    function _transferFromExcluded(address sender, address recipient, ValuesFromAmount memory values) private {
         
-        _tBalances[sender] = _tBalances[sender] - amount;
+        _tBalances[sender] = _tBalances[sender] - values.amount;
         _rBalances[sender] = _rBalances[sender] - values.rAmount;
         _rBalances[recipient] = _rBalances[recipient] + values.rTransferAmount;   
 
@@ -432,10 +433,9 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     }
 
     
-    function _transferBothExcluded(address sender, address recipient, uint256 amount) private {
-        ValuesFromAmount memory values = _getValues(amount);
+    function _transferBothExcluded(address sender, address recipient, ValuesFromAmount memory values) private {
 
-        _tBalances[sender] = _tBalances[sender] - amount;
+        _tBalances[sender] = _tBalances[sender] - values.amount;
         _rBalances[sender] = _rBalances[sender] - values.rAmount;
         _tBalances[recipient] = _tBalances[recipient] + values.tTransferAmount;
         _rBalances[recipient] = _rBalances[recipient] + values.rTransferAmount;        
