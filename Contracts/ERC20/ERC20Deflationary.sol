@@ -5,6 +5,10 @@ pragma solidity ^0.8.4;
 import "../Utils/Context.sol";
 import "../Utils/Ownable.sol";
 import "./IERC20.sol";
+import "../Pancakeswap/Factory.sol";
+import "../Pancakeswap/Pair.sol";
+import "../Pancakeswap/Router01.sol";
+import "../Pancakeswap/Router02.sol";
 
 
 contract ERC20Deflationary is Context, IERC20, Ownable {
