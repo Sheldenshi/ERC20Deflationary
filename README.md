@@ -6,7 +6,7 @@ An ERC20 Token that charges a + b + c % of transaction fees.
 - c% of a transaction will be burnt.
 
 
-Currently supports static reward (automatically redistribute b% of each transactions).
+Currently supports static reward (automatically redistribute b% of each transactions) and burn c% of transactions.
 
 Feel free to submit an issue or pull request :)
 
