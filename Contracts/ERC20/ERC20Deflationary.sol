@@ -34,10 +34,6 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     string private _name;
     string private _symbol;
 
-    // account for burning coins.
-    // 1 - Set liquidity fee
-    // 2 - Set reflection reward
-    // 3 - Set burn %
     address private constant burnAccount = 0x000000000000000000000000000000000000dEaD;
 
     event Burn(address from, uint256 amount);
@@ -245,8 +241,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         _tBalances[burnAccount] += amount;
         _rBalances[burnAccount] += rAmount;
 
-        // decrease the total coin supply
-        //_totalSupply -= amount;
+        // decrease the current coin supply
         _currentSupply -= amount;
 
         emit Burn(account, amount);
@@ -287,8 +282,13 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         return _tFeeTotal;
     }
 
-    // todo: figure out what this does.
-    function reflect(uint256 amount) public {
+    /**
+     * @dev Distribute tokens to all holders that are included from reward. 
+     *
+     *  Requirements:
+     * - the caller must have a balance of at least `amount`.
+     */
+    function distribute(uint256 amount) public {
         address sender = _msgSender();
         require(!_isExcludedFromReward[sender], "Excluded addresses cannot call this function");
         ValuesFromAmount memory values = _getValues(amount);
@@ -359,7 +359,6 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     function _transfer(address sender, address recipient, uint256 amount) private {
         require(sender != address(0), "ERC20: transfer from the zero address");
         require(recipient != address(0), "ERC20: transfer to the zero address");
-        require(amount > 0, "Transfer amount must be greater than zero");
 
         ValuesFromAmount memory values = _getValues(amount);
 
