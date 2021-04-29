@@ -390,7 +390,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
      */
     function _afterTokenTransfer(ValuesFromAmount memory values) internal virtual {
         // burn from contract address
-        burnFrom(address(this), values.tBurnFee);
+        burn(values.tBurnFee);
         
         // reflect
         _distributeFee(values.rRewardFee, values.tRewardFee);
