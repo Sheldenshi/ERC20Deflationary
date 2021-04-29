@@ -2,7 +2,7 @@ pragma solidity ^0.8.4;
 
 // for more info: https://uniswap.org/docs/v2/smart-contracts/router02/
 
-import "./Router01.sol";
+import "./IRouter01.sol";
 
 interface IUniswapV2Router02 is IUniswapV2Router01 {
     function removeLiquidityETHSupportingFeeOnTransferTokens(
