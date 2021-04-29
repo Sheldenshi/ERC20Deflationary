@@ -18,7 +18,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     mapping (address => bool) private _isExcludedFromReward;
     address[] private _excludedFromReward;
    
-    uint8 private  _decimals;
+    uint8 private immutable _decimals;
     uint256 private  _totalSupply;
     uint256 private _currentSupply;
     uint256 private _rTotal;
@@ -291,7 +291,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     function distribute(uint256 amount) public {
         address sender = _msgSender();
         require(!_isExcludedFromReward[sender], "Excluded addresses cannot call this function");
-        ValuesFromAmount memory values = _getValues(amount);
+        ValuesFromAmount memory values = _getValues(amount, false);
         _rBalances[sender] = _rBalances[sender] - values.rAmount;
         _rTotal = _rTotal - values.rAmount;
         _tFeeTotal = _tFeeTotal + amount ;
@@ -300,12 +300,8 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     // todo: figure out what this does.
     function reflectionFromToken(uint256 amount, bool deductTransferFee) public view returns(uint256) {
         require(amount <= _totalSupply, "Amount must be less than supply");
-        ValuesFromAmount memory values = _getValues(amount);
-        if (!deductTransferFee) {
-            return values.rAmount;
-        } else {
-            return values.rTransferAmount;
-        }
+        ValuesFromAmount memory values = _getValues(amount, deductTransferFee);
+        return values.rTransferAmount;
     }
 
     /**
@@ -360,8 +356,8 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         require(sender != address(0), "ERC20: transfer from the zero address");
         require(recipient != address(0), "ERC20: transfer to the zero address");
 
-        ValuesFromAmount memory values = _getValues(amount);
-
+        ValuesFromAmount memory values = _getValues(amount, _isExcludedFromFee[sender]);
+        
         if (_isExcludedFromReward[sender] && !_isExcludedFromReward[recipient]) {
             _transferFromExcluded(sender, recipient, values);
         } else if (!_isExcludedFromReward[sender] && _isExcludedFromReward[recipient]) {
@@ -464,33 +460,46 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         uint256 rLiquidityFee;
         uint256 rTransferAmount;
     }
-
-    function _getValues(uint256 amount) private view returns (ValuesFromAmount memory) {
+   
+    function _getValues(uint256 amount, bool deductTransferFee) private view returns (ValuesFromAmount memory) {
         ValuesFromAmount memory values;
         values.amount = amount;
-        _getTValues(values);
-        _getRValues(values);
+        _getTValues(values, deductTransferFee);
+        _getRValues(values, deductTransferFee);
         return values;
     }
 
-    function _getTValues(ValuesFromAmount memory values) view private {
+    function _getTValues(ValuesFromAmount memory values, bool deductTransferFee) view private {
         
-        // calculate fee
-        values.tBurnFee = _calculateTaxFeeBurn(values.amount);
-        values.tRewardFee = _calculateTaxFeeReward(values.amount);
-        values.tLiquidityFee = _calculateTaxFeeLiquidity(values.amount);
+        if (deductTransferFee) {
+            values.tTransferAmount = values.amount;
+        } else {
+            // calculate fee
+            values.tBurnFee = _calculateTaxFeeBurn(values.amount);
+            values.tRewardFee = _calculateTaxFeeReward(values.amount);
+            values.tLiquidityFee = _calculateTaxFeeLiquidity(values.amount);
+            
+            // amount after fee
+            values.tTransferAmount = values.amount - values.tBurnFee - values.tRewardFee - values.tLiquidityFee;
+        }
         
-        // amount after fee
-        values.tTransferAmount = values.amount - values.tBurnFee - values.tRewardFee - values.tLiquidityFee;
     }
 
-    function _getRValues(ValuesFromAmount memory values) view private {
+    function _getRValues(ValuesFromAmount memory values, bool deductTransferFee) view private {
         uint256 currentRate = _getRate();
+
         values.rAmount = values.amount * currentRate;
-        values.rBurnFee = values.tBurnFee * currentRate;
-        values.rRewardFee = values.tRewardFee * currentRate;
-        values.rLiquidityFee = values.tLiquidityFee * currentRate;
-        values.rTransferAmount = values.rAmount - values.rBurnFee - values.rRewardFee - values.rLiquidityFee;
+
+        if (deductTransferFee) {
+            values.rTransferAmount = values.rAmount;
+        } else {
+            values.rAmount = values.amount * currentRate;
+            values.rBurnFee = values.tBurnFee * currentRate;
+            values.rRewardFee = values.tRewardFee * currentRate;
+            values.rLiquidityFee = values.tLiquidityFee * currentRate;
+            values.rTransferAmount = values.rAmount - values.rBurnFee - values.rRewardFee - values.rLiquidityFee;
+        }
+        
     }
 
     function _getRValuesWithoutFee(uint256 amount) private view returns (uint256) {
