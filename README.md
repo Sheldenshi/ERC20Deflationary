@@ -26,9 +26,9 @@ contract TestCoin is ERC20Deflationary {
     constructor() ERC20Deflationary("TestCoin", "TEST", 9, 100) {
          // default is 0
          // not required
-         setTaxFeeBurn(a);
-         setTaxFeeReward(b);
-         setTaxFeeLiquidity(c);
+         setTaxBurn(a);
+         setTaxReward(b);
+         setTaxLiquidity(c);
     }
 }
 ```
