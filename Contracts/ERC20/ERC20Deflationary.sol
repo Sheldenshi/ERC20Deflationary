@@ -5,10 +5,10 @@ pragma solidity ^0.8.4;
 import "../Utils/Context.sol";
 import "../Utils/Ownable.sol";
 import "./IERC20.sol";
-import "../Pancakeswap/IFactory.sol";
-import "../Pancakeswap/IPair.sol";
-import "../Pancakeswap/IRouter01.sol";
-import "../Pancakeswap/IRouter02.sol";
+import "../../Interfaces/Pancakeswap/IFactory.sol";
+import "../../Interfaces/Pancakeswap/IPair.sol";
+import "../../Interfaces/Pancakeswap/IRouter01.sol";
+import "../../Interfaces/Pancakeswap/IRouter02.sol";
 
 
 contract ERC20Deflationary is Context, IERC20, Ownable {
@@ -23,8 +23,8 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
 
 
     // liquidity pool provider router
-    IUniswapV2Router02 public uniswapV2Router;
-    address public uniswapV2Pair;
+    IUniswapV2Router02 public _uniswapV2Router;
+    address public _uniswapV2Pair;
 
     address private constant burnAccount = 0x000000000000000000000000000000000000dEaD;
 
@@ -453,7 +453,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
 
             if (overMinTokensBeforeSwap &&
                 !_inSwapAndLiquify &&
-                _msgSender() != uniswapV2Pair &&
+                _msgSender() != _uniswapV2Pair &&
                 _autoSwapAndLiquifyEnabled
                 ) 
             {
@@ -531,13 +531,13 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         // generate the uniswap pair path of token -> weth
         address[] memory path = new address[](2);
         path[0] = address(this);
-        path[1] = uniswapV2Router.WETH();
+        path[1] = _uniswapV2Router.WETH();
 
-        _approve(address(this), address(uniswapV2Router), amount);
+        _approve(address(this), address(_uniswapV2Router), amount);
 
 
         // swap tokens to eth
-        uniswapV2Router.swapExactTokensForETHSupportingFeeOnTransferTokens(
+        _uniswapV2Router.swapExactTokensForETHSupportingFeeOnTransferTokens(
             amount, 
             0, 
             path, 
@@ -546,10 +546,10 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
             );
     }
     function addLiquidity(uint256 ethAmount, uint256 tokenAmount) private {
-        _approve(address(this), address(uniswapV2Router), tokenAmount);
+        _approve(address(this), address(_uniswapV2Router), tokenAmount);
 
         // add the liquidity
-        uniswapV2Router.addLiquidityETH{value: ethAmount}(
+        _uniswapV2Router.addLiquidityETH{value: ethAmount}(
             address(this), 
             tokenAmount, 
             0, // slippage is unavoidable
@@ -653,18 +653,17 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         emit EnabledReward(taxReward_);
     }
 
-    function enableAutoSwapAndLiquify(uint8 taxLiquidity_, address routerAddress, uint256 minTokensBeforeSwap_) public onlyOwner {
+    function enableAutoSwapAndLiquify(uint8 taxLiquidity_, IUniswapV2Router02 uniswapV2Router, uint256 minTokensBeforeSwap_) public onlyOwner {
         require(!_autoSwapAndLiquifyEnabled, "Auto swap and liquify feature is already enabled.");
 
         _minTokensBeforeSwap = minTokensBeforeSwap_;
 
         // init Router
-        IUniswapV2Router02 _uniswapV2Router = IUniswapV2Router02(routerAddress);
 
-        uniswapV2Pair = IUniswapV2Factory(_uniswapV2Router.factory())
-            .createPair(address(this), _uniswapV2Router.WETH());
+        _uniswapV2Pair = IUniswapV2Factory(uniswapV2Router.factory())
+            .createPair(address(this), uniswapV2Router.WETH());
 
-        uniswapV2Router = _uniswapV2Router;
+        _uniswapV2Router = uniswapV2Router;
 
         // enable
         _autoSwapAndLiquifyEnabled = true;
