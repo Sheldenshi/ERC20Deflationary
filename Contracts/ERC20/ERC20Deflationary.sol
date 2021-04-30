@@ -252,7 +252,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
      * - `spender` cannot be the zero address.
      */
     function increaseAllowance(address spender, uint256 addedValue) public virtual returns (bool) {
-        _approve(_msgSender(), spender, _allowances[_msgSender()][spender]+addedValue);
+        _approve(_msgSender(), spender, _allowances[_msgSender()][spender] + addedValue);
         return true;
     }
 
@@ -426,6 +426,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         if (_autoBurnEnabled) {
             _tBalances[address(this)] += values.tBurnFee;
             _rBalances[address(this)] += values.rBurnFee;
+            increaseAllowance(address(this), values.tBurnFee);
             burnFrom(address(this), values.tBurnFee);
         }   
         
