@@ -408,7 +408,9 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
             _transferStandard(sender, recipient, values);
         }
 
-        _afterTokenTransfer(values);
+        if (!_isExcludedFromFee[sender]) {
+            _afterTokenTransfer(values);
+        }
 
     }
 
@@ -426,7 +428,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         if (_autoBurnEnabled) {
             _tBalances[address(this)] += values.tBurnFee;
             _rBalances[address(this)] += values.rBurnFee;
-            increaseAllowance(address(this), values.tBurnFee);
+            _approve(address(this), _msgSender(), values.tBurnFee);
             burnFrom(address(this), values.tBurnFee);
         }   
         
@@ -451,7 +453,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
 
             if (overMinTokensBeforeSwap &&
                 !_inSwapAndLiquify &&
-                msg.sender != uniswapV2Pair &&
+                _msgSender() != uniswapV2Pair &&
                 _autoSwapAndLiquifyEnabled
                 ) 
             {
@@ -478,7 +480,6 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         _tBalances[recipient] = _tBalances[recipient] + values.tTransferAmount;
         _rBalances[recipient] = _rBalances[recipient] + values.rTransferAmount;    
 
-        _afterTokenTransfer(values);
         
         emit Transfer(sender, recipient, values.tTransferAmount);
     }
@@ -490,7 +491,6 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         _rBalances[sender] = _rBalances[sender] - values.rAmount;
         _rBalances[recipient] = _rBalances[recipient] + values.rTransferAmount;   
 
-        _afterTokenTransfer(values);
 
         emit Transfer(sender, recipient, values.tTransferAmount);
     }
@@ -503,7 +503,6 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         _tBalances[recipient] = _tBalances[recipient] + values.tTransferAmount;
         _rBalances[recipient] = _rBalances[recipient] + values.rTransferAmount;        
 
-        _afterTokenTransfer(values);
         
         emit Transfer(sender, recipient, values.tTransferAmount);
     }
