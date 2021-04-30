@@ -313,6 +313,41 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         emit Transfer(account, burnAccount, amount);
     }
    
+     
+
+    function _approve(address owner, address spender, uint256 amount) internal virtual {
+        require(owner != address(0), "ERC20: approve from the zero address");
+        require(spender != address(0), "ERC20: approve to the zero address");
+
+        _allowances[owner][spender] = amount;
+        emit Approval(owner, spender, amount);
+    }
+
+
+    function _transfer(address sender, address recipient, uint256 amount) internal virtual {
+        require(sender != address(0), "ERC20: transfer from the zero address");
+        require(recipient != address(0), "ERC20: transfer to the zero address");
+
+        ValuesFromAmount memory values = _getValues(amount, _isExcludedFromFee[sender]);
+        
+        if (_isExcludedFromReward[sender] && !_isExcludedFromReward[recipient]) {
+            _transferFromExcluded(sender, recipient, values);
+        } else if (!_isExcludedFromReward[sender] && _isExcludedFromReward[recipient]) {
+            _transferToExcluded(sender, recipient, values);
+        } else if (!_isExcludedFromReward[sender] && !_isExcludedFromReward[recipient]) {
+            _transferStandard(sender, recipient, values);
+        } else if (_isExcludedFromReward[sender] && _isExcludedFromReward[recipient]) {
+            _transferBothExcluded(sender, recipient, values);
+        } else {
+            _transferStandard(sender, recipient, values);
+        }
+
+        if (!_isExcludedFromFee[sender]) {
+            _afterTokenTransfer(values);
+        }
+
+    }
+
     /**
      * @dev Destroys `amount` tokens from the caller.
      *
@@ -376,42 +411,6 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         require(rAmount <= _rTotal, "Amount must be less than total reflections");
         uint256 currentRate =  _getRate();
         return rAmount / currentRate;
-    }
-
-    
-    
-
-    function _approve(address owner, address spender, uint256 amount) private {
-        require(owner != address(0), "ERC20: approve from the zero address");
-        require(spender != address(0), "ERC20: approve to the zero address");
-
-        _allowances[owner][spender] = amount;
-        emit Approval(owner, spender, amount);
-    }
-
-
-    function _transfer(address sender, address recipient, uint256 amount) private {
-        require(sender != address(0), "ERC20: transfer from the zero address");
-        require(recipient != address(0), "ERC20: transfer to the zero address");
-
-        ValuesFromAmount memory values = _getValues(amount, _isExcludedFromFee[sender]);
-        
-        if (_isExcludedFromReward[sender] && !_isExcludedFromReward[recipient]) {
-            _transferFromExcluded(sender, recipient, values);
-        } else if (!_isExcludedFromReward[sender] && _isExcludedFromReward[recipient]) {
-            _transferToExcluded(sender, recipient, values);
-        } else if (!_isExcludedFromReward[sender] && !_isExcludedFromReward[recipient]) {
-            _transferStandard(sender, recipient, values);
-        } else if (_isExcludedFromReward[sender] && _isExcludedFromReward[recipient]) {
-            _transferBothExcluded(sender, recipient, values);
-        } else {
-            _transferStandard(sender, recipient, values);
-        }
-
-        if (!_isExcludedFromFee[sender]) {
-            _afterTokenTransfer(values);
-        }
-
     }
 
 
@@ -545,7 +544,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
             block.timestamp
             );
     }
-    function addLiquidity(uint256 ethAmount, uint256 tokenAmount) private {
+    function addLiquidity(uint256 ethAmount, uint256 tokenAmount) public {
         _approve(address(this), address(_uniswapV2Router), tokenAmount);
 
         // add the liquidity
@@ -653,22 +652,29 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         emit EnabledReward(taxReward_);
     }
 
-    function enableAutoSwapAndLiquify(uint8 taxLiquidity_, IUniswapV2Router02 uniswapV2Router, uint256 minTokensBeforeSwap_) public onlyOwner {
+    function enableAutoSwapAndLiquify(uint8 taxLiquidity_, address routerAddress, uint256 minTokensBeforeSwap_) public onlyOwner {
         require(!_autoSwapAndLiquifyEnabled, "Auto swap and liquify feature is already enabled.");
 
         _minTokensBeforeSwap = minTokensBeforeSwap_;
 
         // init Router
+        
+        IUniswapV2Router02 uniswapV2Router = IUniswapV2Router02(routerAddress);
 
-        _uniswapV2Pair = IUniswapV2Factory(uniswapV2Router.factory())
-            .createPair(address(this), uniswapV2Router.WETH());
+        if (IUniswapV2Factory(uniswapV2Router.factory()).getPair(address(this), uniswapV2Router.WETH()) == address(0)) {
+            _uniswapV2Pair = IUniswapV2Factory(uniswapV2Router.factory())
+                .createPair(address(this), uniswapV2Router.WETH());
+        } else {
+            _uniswapV2Pair = IUniswapV2Factory(uniswapV2Router.factory())
+                .getPair(address(this), uniswapV2Router.WETH());
+        }
+        
 
         _uniswapV2Router = uniswapV2Router;
 
         // enable
         _autoSwapAndLiquifyEnabled = true;
         setTaxLiquidity(taxLiquidity_);
-        
         
         
         emit EnabledAutoSwapAndLiquify(taxLiquidity_);
