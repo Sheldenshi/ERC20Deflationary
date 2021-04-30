@@ -397,7 +397,6 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         _tFeeTotal = _tFeeTotal + amount ;
     }
 
-    // todo: figure out what this does.
     function reflectionFromToken(uint256 amount, bool deductTransferFee) public view returns(uint256) {
         require(amount <= _totalSupply, "Amount must be less than supply");
         ValuesFromAmount memory values = _getValues(amount, deductTransferFee);
