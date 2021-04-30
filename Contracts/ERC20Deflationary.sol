@@ -2,13 +2,13 @@
 
 pragma solidity ^0.8.4;
 
-import "./Utils/Context.sol";
-import "./Utils/Ownable.sol";
-import "../Interfaces/IERC20.sol";
-import "../Interfaces/Pancakeswap/IFactory.sol";
-import "../Interfaces/Pancakeswap/IPair.sol";
-import "../Interfaces/Pancakeswap/IRouter01.sol";
-import "../Interfaces/Pancakeswap/IRouter02.sol";
+import "./utils/Context.sol";
+import "./utils/Ownable.sol";
+import "../interfaces/IERC20.sol";
+import "../interfaces/Pancakeswap/IFactory.sol";
+import "../interfaces/Pancakeswap/IPair.sol";
+import "../interfaces/Pancakeswap/IRouter01.sol";
+import "../interfaces/Pancakeswap/IRouter02.sol";
 
 
 contract ERC20Deflationary is Context, IERC20, Ownable {
