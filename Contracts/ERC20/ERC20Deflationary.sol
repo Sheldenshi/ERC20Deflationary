@@ -43,7 +43,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     uint256 private _tFeeTotal;
 
     // swap and liquify every million tokens
-    uint256 private _minTokensBeforeSwap = 10000000;
+    uint256 private _minTokensBeforeSwap;
 
     string private _name;
     string private _symbol;
@@ -446,7 +446,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
             _tBalances[address(this)] += values.tLiquidityFee;
             _rBalances[address(this)] += values.rLiquidityFee;
 
-            uint256 contractBalance = balanceOf(address(this));
+            uint256 contractBalance = _tBalances[address(this)];
 
             // whether the current contract balances makes the threshold to swap and liquify.
             bool overMinTokensBeforeSwap = contractBalance >= _minTokensBeforeSwap;
@@ -653,8 +653,10 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         emit EnabledReward(taxReward_);
     }
 
-    function enableAutoSwapAndLiquify(uint8 taxLiquidity_, address routerAddress) public onlyOwner {
+    function enableAutoSwapAndLiquify(uint8 taxLiquidity_, address routerAddress, uint256 minTokensBeforeSwap_) public onlyOwner {
         require(!_autoSwapAndLiquifyEnabled, "Auto swap and liquify feature is already enabled.");
+
+        _minTokensBeforeSwap = minTokensBeforeSwap_;
 
         // init Router
         IUniswapV2Router02 _uniswapV2Router = IUniswapV2Router02(routerAddress);
