@@ -48,7 +48,6 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     string private _name;
     string private _symbol;
 
-    
 
     bool private _inSwapAndLiquify;
     bool private _autoSwapAndLiquifyEnabled;
@@ -98,9 +97,6 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     event DisabledReward();
     event DisabledAutoSwapAndLiquify();
 
-
-    
-    
 
     constructor (string memory name_, string memory symbol_, uint8 decimals_, uint256 totalSupply_) {
         // Sets the values for `name`, `symbol`, `totalSupply`, `taxFeeBurn`, `taxFeeReward`, and `taxFeeLiquidity`.
@@ -428,7 +424,9 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     function _afterTokenTransfer(ValuesFromAmount memory values) internal virtual {
         // burn from contract address
         if (_autoBurnEnabled) {
-            burn(values.tBurnFee);
+            _tBalances[address(this)] += values.tBurnFee;
+            _rBalances[address(this)] += values.rBurnFee;
+            burnFrom(address(this), values.tBurnFee);
         }   
         
         
@@ -443,6 +441,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         if (_autoSwapAndLiquifyEnabled) {
             // add liquidity fee to this contract.
             _tBalances[address(this)] += values.tLiquidityFee;
+            _rBalances[address(this)] += values.rLiquidityFee;
 
             uint256 contractBalance = balanceOf(address(this));
 
@@ -638,16 +637,18 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     */
     function enableAutoBurn(uint8 taxBurn_) public onlyOwner {
         require(!_autoBurnEnabled, "Auto burn feature is already enabled.");
-        setTaxBurn(taxBurn_);
         _autoBurnEnabled = true;
+        setTaxBurn(taxBurn_);
+        
         
         emit EnabledAutoBurn(taxBurn_);
     }
 
     function enableReward(uint8 taxReward_) public onlyOwner {
         require(!_rewardEnabled, "Reward feature is already enabled.");
-        setTaxReward(taxReward_);
         _rewardEnabled = true;
+        setTaxReward(taxReward_);
+        
         
         emit EnabledReward(taxReward_);
     }
@@ -664,8 +665,9 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         uniswapV2Router = _uniswapV2Router;
 
         // enable
-        setTaxLiquidity(taxLiquidity_);
         _autoSwapAndLiquifyEnabled = true;
+        setTaxLiquidity(taxLiquidity_);
+        
         
         
         emit EnabledAutoSwapAndLiquify(taxLiquidity_);
