@@ -6,7 +6,7 @@ import "./ERC20Deflationary.sol";
 contract Example is Context, ERC20Deflationary {
 
     // pancakeswap for testnet
-    address routerAddress = 0x73D58041eDdD468e016Cfbc13f3BDc4248cCD65D;
+    address routerAddress = 0xD99D1c33F9fC3444f8101754aBC46c52416550D1;
 
     string name_ = "Example Token";
     string symbol_ = "EXT";
