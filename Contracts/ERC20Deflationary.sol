@@ -23,8 +23,8 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
 
 
     // liquidity pool provider router
-    IUniswapV2Router02 public _uniswapV2Router;
-    address public _uniswapV2Pair;
+    IUniswapV2Router02 internal _uniswapV2Router;
+    address internal _uniswapV2Pair;
 
     address private constant burnAccount = 0x000000000000000000000000000000000000dEaD;
 
@@ -388,7 +388,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
      *  Requirements:
      * - the caller must have a balance of at least `amount`.
      */
-    function distribute(uint256 amount) public {
+    function airdrop(uint256 amount) public {
         address sender = _msgSender();
         require(!_isExcludedFromReward[sender], "Excluded addresses cannot call this function");
         ValuesFromAmount memory values = _getValues(amount, false);
@@ -507,7 +507,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
 
     receive() external payable {}
 
-    function swapAndLiquify(uint256 contractBalance) private lockTheSwap {
+    function swapAndLiquify(uint256 contractBalance) internal lockTheSwap {
         // split the contract balance into two halves.
         uint256 tokensToSwap = contractBalance / 2;
         uint256 tokensAddToLiquidity = contractBalance - tokensToSwap;
@@ -707,7 +707,11 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         emit DisabledAutoSwapAndLiquify();
     }
 
-    
+    function setMinTokensBeforeSwap(uint256 minTokensBeforeSwap_) public onlyOwner {
+        require(minTokensBeforeSwap_ < _currentSupply, "minTokensBeforeSwap must be higher than current supply.");
+        _minTokensBeforeSwap = minTokensBeforeSwap_;
+    }
+
     function setTaxBurn(uint8 taxBurn_) public onlyOwner {
         require(_autoBurnEnabled, "Auto burn feature must be enabled. Try the EnableAutoBurn function.");
         require(taxBurn_ + _taxReward + _taxLiquidity < 100, "Tax fee too high.");
