@@ -21,6 +21,9 @@
   "homepage": "https://github.com/Sheldenshi/ERC20Deflationary#readme",
   "devDependencies": {
     "@openzeppelin/test-helpers": "^0.5.11",
-    "ganache-cli": "^6.12.2"
+    "@truffle/hdwallet-provider": "^1.3.0",
+    "chai": "^4.3.4",
+    "ganache-cli": "^6.12.2",
+    "truffle": "^5.3.4"
   }
 }
