@@ -24,7 +24,11 @@
     "@truffle/hdwallet-provider": "^1.2.3",
     "chai": "^4.3.4",
     "ganache-cli": "^6.12.2",
-    "truffle": "^5.3.4"
+    "truffle": "^5.3.4",
+    "truffle-plugin-verify": "^0.5.7"
   },
-  "dependencies": {}
+  "dependencies": {},
+  "peerDependencies": {
+    "@nomiclabs/buidler": "^1.0.0-beta.2"
+  }
 }

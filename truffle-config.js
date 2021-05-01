@@ -19,8 +19,7 @@
  */
 
  const HDWalletProvider = require('@truffle/hdwallet-provider');
- const fs = require('fs');
- const mnemonic = fs.readFileSync(".secret").toString().trim();
+ const { mnemonic, BSCSCANAPIKEY } = require('./.secret.json')
  
  
  // const infuraKey = "fj4jll3k.....";
@@ -35,7 +34,7 @@
     *
     * $ truffle test --network <network-name>
     */
- 
+  
    networks: {
      development: {
        host: "127.0.0.1",     // Localhost (default: none)
@@ -88,6 +87,12 @@
  
    db: {
      enabled: false
+   },
+   plugins: [
+    'truffle-plugin-verify'
+   ],
+   api_keys: {
+     bscscan: BSCSCANAPIKEY
    }
  };
  
