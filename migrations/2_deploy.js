@@ -1,5 +1,5 @@
-const Example = artifacts.require("Example");
+const ExampleToken = artifacts.require("ExampleToken");
 
 module.exports = async function (deployer) {
-  await deployer.deploy(Example);
+  await deployer.deploy(ExampleToken);
 };
