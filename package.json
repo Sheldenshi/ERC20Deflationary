@@ -1,0 +1,26 @@
+{
+  "name": "ERC20Deflationary",
+  "version": "1.0.0",
+  "description": "An ERC20 Token that charges a + b + c % of transaction fees.  - a% of a transaction will be automatically add to the liquidity pool and be locked. - b% of a transaction will be redistribute(reflect) to all holders.  - c% of a transaction will be burnt.",
+  "main": "truffle-config.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sheldenshi/ERC20Deflationary.git"
+  },
+  "author": "Shelden Shi",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Sheldenshi/ERC20Deflationary/issues"
+  },
+  "homepage": "https://github.com/Sheldenshi/ERC20Deflationary#readme",
+  "devDependencies": {
+    "@openzeppelin/test-helpers": "^0.5.11",
+    "ganache-cli": "^6.12.2"
+  }
+}
