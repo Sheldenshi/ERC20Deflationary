@@ -505,6 +505,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         emit Transfer(sender, recipient, values.tTransferAmount);
     }
 
+    // allow the contract to receive ETH
     receive() external payable {}
 
     function swapAndLiquify(uint256 contractBalance) internal lockTheSwap {
@@ -540,7 +541,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
             0, 
             path, 
             address(this), 
-            block.timestamp
+            block.timestamp + 60 * 1000
             );
     }
     function addLiquidity(uint256 ethAmount, uint256 tokenAmount) public {
@@ -553,7 +554,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
             0, // slippage is unavoidable
             0, // slippage is unavoidable
             address(this), 
-            block.timestamp
+            block.timestamp + 60 * 1000
         );
     }
     function _distributeFee(uint256 rFee, uint256 tFee) private {
