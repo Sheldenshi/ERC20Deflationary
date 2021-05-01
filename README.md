@@ -32,3 +32,11 @@ contract TestCoin is ERC20Deflationary {
     }
 }
 ```
+
+## How to run test:
+
+In the terminal
+
+```
+truffle test
+```
