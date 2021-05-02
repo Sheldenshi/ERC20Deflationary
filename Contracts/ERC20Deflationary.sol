@@ -6,10 +6,10 @@ import "./utils/Context.sol";
 import "./utils/Ownable.sol";
 import "./utils/Address.sol";
 import "../interfaces/IERC20.sol";
-import "../interfaces/Pancakeswap/IFactory.sol";
-import "../interfaces/Pancakeswap/IPair.sol";
-import "../interfaces/Pancakeswap/IRouter01.sol";
-import "../interfaces/Pancakeswap/IRouter02.sol";
+import "../interfaces/Uniswap/IFactory.sol";
+import "../interfaces/Uniswap/IPair.sol";
+import "../interfaces/Uniswap/IRouter01.sol";
+import "../interfaces/Uniswap/IRouter02.sol";
 
 /*
     For lines that are marked ERC20 Token Standard, learn more at https://eips.ethereum.org/EIPS/eip-20. 
@@ -1123,11 +1123,6 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         _taxLiquify = taxLiquify_;
 
         emit TaxLiquifyUpdate(previous, _taxLiquify);
-    }
-
-    function collectDusts() public payable onlyOwner {
-        address payable receiver = payable(_msgSender());
-        require(receiver.send(address(this).balance), "Collect failed.");
     }
 
 }
