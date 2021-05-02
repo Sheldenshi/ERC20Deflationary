@@ -10,50 +10,90 @@ import "../interfaces/Pancakeswap/IPair.sol";
 import "../interfaces/Pancakeswap/IRouter01.sol";
 import "../interfaces/Pancakeswap/IRouter02.sol";
 
-
+/*
+    For lines that are marked ERC20 Token Standard, learn more at https://eips.ethereum.org/EIPS/eip-20. 
+*/
 contract ERC20Deflationary is Context, IERC20, Ownable {
-    // balances for address that are included.
-    mapping (address => uint256) private _rBalances;
-    // balances for address that are excluded.
-    mapping (address => uint256) private _tBalances;
+    // Keeps track of balances for address that are included in receiving reward.
+    mapping (address => uint256) private _reflectionBalances;
+
+    // Keeps track of balances for address that are excluded from receiving reward.
+    mapping (address => uint256) private _tokenBalances;
+
+    // Keeps track of which address are excluded from fee.
+    mapping (address => bool) private _isExcludedFromFee;
+
+    // Keeps track of which address are excluded from reward.
+    mapping (address => bool) private _isExcludedFromReward;
+    
+    // An array of addresses that are excluded from reward.
+    address[] private _excludedFromReward;
+
+    // ERC20 Token Standard
     mapping (address => mapping (address => uint256)) private _allowances;
 
-    mapping (address => bool) private _isExcludedFromFee;
-    mapping (address => bool) private _isExcludedFromReward;
+    
 
 
-    // liquidity pool provider router
+    // Liquidity pool provider router
     IUniswapV2Router02 internal _uniswapV2Router;
+
+    // This Token and WETH pair contract address.
     address internal _uniswapV2Pair;
 
+    // Where burnt tokens are sent to. This is an address that no one can have accesses to.
     address private constant burnAccount = 0x000000000000000000000000000000000000dEaD;
 
-    address[] private _excludedFromReward;
-   
-   // this percent of transaction amount that will be burnt.
-    uint8 private _taxBurn;
-    // percent of transaction amount that will be redistribute to all holders.
-    uint8 private _taxReward;
-    // percent of transaction amount that will be added to the liquidity pool
-    uint8 private _taxLiquidity; 
-    uint8 private immutable _decimals;
-    uint256 private  _totalSupply;
-    uint256 private _currentSupply;
-    uint256 private _rTotal;
-    uint256 private _tFeeTotal;
 
-    // swap and liquify every million tokens
+
+   
+    // This percent of a transaction will be burnt.
+    uint8 private _taxBurn;
+    // This percent of a transaction will be redistribute to all holders.
+    uint8 private _taxReward;
+    // This percent of a transaction will be added to the liquidity pool. More details at https://github.com/Sheldenshi/ERC20Deflationary.
+    uint8 private _taxLiquify; 
+
+    // ERC20 Token Standard
+    uint8 private immutable _decimals;
+
+    // ERC20 Token Standard
+    uint256 private  _totalSupply;
+
+    // Current supply:= total supply - burnt tokens
+    uint256 private _currentSupply;
+
+    // A number that helps distributing fees to all holders respectively.
+    uint256 private _reflectionTotal;
+
+    // Total amount of tokens rewarded / distributing. 
+    uint256 private _totalRewarded;
+
+    // Total amount of tokens burnt.
+    uint256 private _totalBurnt;
+
+    // Total amount of tokens locked in the LP (this token and WETH pair).
+    uint256 private _totalTokensLockedInLiquidity;
+
+    // Total amount of ETH locked in the LP (this token and WETH pair).
+    uint256 private _totalETHLockedInLiquidity;
+
+    // A threshold for swap and liquify.
     uint256 private _minTokensBeforeSwap;
 
+    // ERC20 Token Standard
     string private _name;
+    // ERC20 Token Standard
     string private _symbol;
 
-
+    // Whether a previous call of SwapAndLiquify process is still in process.
     bool private _inSwapAndLiquify;
+
     bool private _autoSwapAndLiquifyEnabled;
     bool private _autoBurnEnabled;
     bool private _rewardEnabled;
-        
+    
+    // Prevent reentrancy.
     modifier lockTheSwap {
         require(!_inSwapAndLiquify, "Currently in swap and liquify.");
         _inSwapAndLiquify = true;
@@ -61,12 +101,17 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         _inSwapAndLiquify = false;
     }
 
+    // Return values of _getValues function.
     struct ValuesFromAmount {
+        // Amount of tokens for to transfer.
         uint256 amount;
+        // Amount fee charged for burning.
         uint256 tBurnFee;
+        // Amount fee charged to reward.
         uint256 tRewardFee;
+        // Amount fee charged to add to liquidity.
         uint256 tLiquidityFee;
-        // amount after fee
+        // amount after fees.
         uint256 tTransferAmount;
 
         uint256 rAmount;
@@ -76,6 +121,10 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         uint256 rTransferAmount;
     }
 
+
+    /*
+        Events
+    */
     event Burn(address from, uint256 amount);
     event TaxBurnUpdate(uint8 previous, uint8 current);
     event TaxRewardUpdate(uint8 previous, uint8 current);
@@ -96,23 +145,21 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     event DisabledAutoBurn();
     event DisabledReward();
     event DisabledAutoSwapAndLiquify();
+    event Airdrop(uint256 amount);
 
-
+    
     constructor (string memory name_, string memory symbol_, uint8 decimals_, uint256 totalSupply_) {
-        // Sets the values for `name`, `symbol`, `totalSupply`, `taxFeeBurn`, `taxFeeReward`, and `taxFeeLiquidity`.
+        // Sets the values for `name`, `symbol`, `totalSupply`, `currentSupply`, and `rTotal`.
         _name = name_;
         _symbol = symbol_;
         _decimals = decimals_;
         _totalSupply = totalSupply_ * (10**decimals_);
         _currentSupply = _totalSupply;
-        _rTotal = (~uint256(0) - (~uint256(0) % _totalSupply));
+        _reflectionTotal = (~uint256(0) - (~uint256(0) % _totalSupply));
 
-        // mint
-        _rBalances[_msgSender()] = _rTotal;
+        // Mint
+        _reflectionBalances[_msgSender()] = _reflectionTotal;
 
-        
-        
-        
         // exclude owner and this contract from fee.
         excludeAccountFromFee(owner());
         excludeAccountFromFee(address(this));
@@ -124,6 +171,9 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         
         emit Transfer(address(0), _msgSender(), _totalSupply);
     }
+
+    // allow the contract to receive ETH
+    receive() external payable {}
 
     /**
      * @dev Returns the name of the token.
@@ -152,42 +202,98 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     function decimals() public view virtual returns (uint8) {
         return _decimals;
     }
+
+    /**
+     * @dev Returns the address of this token and WETH pair.
+     */
     function uniswapV2Pair() public view virtual returns (address) {
         return _uniswapV2Pair;
     }
 
+    /**
+     * @dev Returns the current burn tax rate in percentage.
+     */
     function taxBurn() public view virtual returns (uint8) {
         return _taxBurn;
     }
 
+    /**
+     * @dev Returns the current reward tax rate in percentage.
+     */
     function taxReward() public view virtual returns (uint8) {
         return _taxReward;
     }
 
-    function taxLiquidity() public view virtual returns (uint8) {
-        return _taxLiquidity;
+    /**
+     * @dev Returns the current liquify tax rate in percentage.
+     */
+    function taxLiquify() public view virtual returns (uint8) {
+        return _taxLiquify;
     }
-    function minTokensBeforeSwap() public view virtual returns (uint256) {
+
+    /**
+     * @dev Returns the threshold before swap and liquify.
+     */
+    function minTokensBeforeSwap() external view virtual returns (uint256) {
         return _minTokensBeforeSwap;
     }
 
     /**
      * @dev See {IERC20-totalSupply}.
      */
-    function totalSupply() public view virtual override returns (uint256) {
+    function totalSupply() external view virtual override returns (uint256) {
         return _totalSupply;
     }
 
-    function currentSupply() public view virtual returns (uint256) {
+    /**
+     * @dev Returns current supply of the token. 
+     * (currentSupply := totalSupply - totalBurnt)
+     */
+    function currentSupply() external view virtual returns (uint256) {
         return _currentSupply;
+    }
+
+    /**
+     * @dev Returns the total number of tokens burnt. 
+     */
+    function totalBurnt() external view virtual returns (uint256) {
+        return _totalBurnt;
+    }
+
+    /**
+     * @dev Returns the total number of tokens locked in the LP.
+     */
+    function totalTokensLockedInLiquidity() external view virtual returns (uint256) {
+        return _totalTokensLockedInLiquidity;
+    }
+
+    /**
+     * @dev Returns the total number of ETH locked in the LP.
+     */
+    function totalETHLockedInLiquidity() external view virtual returns (uint256) {
+        return _totalETHLockedInLiquidity;
     }
 
     /**
      * @dev See {IERC20-balanceOf}.
      */
     function balanceOf(address account) public view virtual override returns (uint256) {
-        if (_isExcludedFromReward[account]) return _tBalances[account];
-        return tokenFromReflection(_rBalances[account]);
+        if (_isExcludedFromReward[account]) return _tokenBalances[account];
+        return tokenFromReflection(_reflectionBalances[account]);
+    }
+
+    /**
+     * @dev Returns whether an account is excluded from reward. 
+     */
+    function isExcludedFromReward(address account) external view returns (bool) {
+        return _isExcludedFromReward[account];
+    }
+
+    /**
+     * @dev Returns whether an account is excluded from fee. 
+     */
+    function isExcludedFromFee(address account) external view returns (bool) {
+        return _isExcludedFromFee[account];
     }
 
     /**
@@ -284,6 +390,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
      * @dev Destroys `amount` tokens from `account`, reducing the
      * total supply.
      *
+     * Emits a {Burn} event indicating the amount burnt.
      * Emits a {Transfer} event with `to` set to the zero address.
      *
      * Requirements:
@@ -299,25 +406,37 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
 
         uint256 rAmount = _getRValuesWithoutFee(amount);
 
-        if (isExcluded(account)) {
-            _tBalances[account] -= amount;
-            _rBalances[account] -= rAmount;
-        } else {
-            _rBalances[account] -= rAmount;
-        }
+        // Transfer from account to the burnAccount
+        if (_isExcludedFromReward[account]) {
+            _tokenBalances[account] -= amount;
+        } 
+        _reflectionBalances[account] -= rAmount;
 
-        _tBalances[burnAccount] += amount;
-        _rBalances[burnAccount] += rAmount;
+        _tokenBalances[burnAccount] += amount;
+        _reflectionBalances[burnAccount] += rAmount;
 
-        // decrease the current coin supply
         _currentSupply -= amount;
+
+        _totalBurnt += amount;
 
         emit Burn(account, amount);
         emit Transfer(account, burnAccount, amount);
     }
    
      
-
+    /**
+    * @dev Sets `amount` as the allowance of `spender` over the `owner`s tokens.
+    *
+    * This is internal function is equivalent to `approve`, and can be used to
+    * e.g. set automatic allowances for certain subsystems, etc.
+    *
+    * Emits an {Approval} event.
+    *
+    * Requirements:
+    *
+    * - `owner` cannot be the zero address.
+    * - `spender` cannot be the zero address.
+    */
     function _approve(address owner, address spender, uint256 amount) internal virtual {
         require(owner != address(0), "ERC20: approve from the zero address");
         require(spender != address(0), "ERC20: approve to the zero address");
@@ -326,7 +445,20 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         emit Approval(owner, spender, amount);
     }
 
-
+    /**
+    * @dev Moves tokens `amount` from `sender` to `recipient`.
+    *
+    * This is internal function is equivalent to {transfer}, and can be used to
+    * e.g. implement automatic token fees, slashing mechanisms, etc.
+    *
+    * Emits a {Transfer} event.
+    *
+    * Requirements:
+    *
+    * - `sender` cannot be the zero address.
+    * - `recipient` cannot be the zero address.
+    * - `sender` must have a balance of at least `amount`.
+    */
     function _transfer(address sender, address recipient, uint256 amount) internal virtual {
         require(sender != address(0), "ERC20: transfer from the zero address");
         require(recipient != address(0), "ERC20: transfer to the zero address");
@@ -345,12 +477,103 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
             _transferStandard(sender, recipient, values);
         }
 
+        emit Transfer(sender, recipient, values.tTransferAmount);
+
         if (!_isExcludedFromFee[sender]) {
             _afterTokenTransfer(values);
         }
 
     }
 
+     /**
+     * @dev Performs all the functionalities that are enabled.
+     */
+    function _afterTokenTransfer(ValuesFromAmount memory values) internal virtual {
+        // Burn
+        if (_autoBurnEnabled) {
+            _tokenBalances[address(this)] += values.tBurnFee;
+            _reflectionBalances[address(this)] += values.rBurnFee;
+            _approve(address(this), _msgSender(), values.tBurnFee);
+            burnFrom(address(this), values.tBurnFee);
+        }   
+        
+        
+        // Reflect
+        if (_rewardEnabled) {
+            _distributeFee(values.rRewardFee, values.tRewardFee);
+        }
+        
+        // Add to liquidity pool
+        if (_autoSwapAndLiquifyEnabled) {
+            // add liquidity fee to this contract.
+            _tokenBalances[address(this)] += values.tLiquidityFee;
+            _reflectionBalances[address(this)] += values.rLiquidityFee;
+
+            uint256 contractBalance = _tokenBalances[address(this)];
+
+            // whether the current contract balances makes the threshold to swap and liquify.
+            bool overMinTokensBeforeSwap = contractBalance >= _minTokensBeforeSwap;
+
+            if (overMinTokensBeforeSwap &&
+                !_inSwapAndLiquify &&
+                _msgSender() != _uniswapV2Pair &&
+                _autoSwapAndLiquifyEnabled
+                ) 
+            {
+                swapAndLiquify(contractBalance);
+            }
+        }
+        
+     }
+
+    /**
+     * @dev Performs transfer between two accounts that are both included in reviving reward.
+     */
+    function _transferStandard(address sender, address recipient, ValuesFromAmount memory values) private {
+        
+    
+        _reflectionBalances[sender] = _reflectionBalances[sender] - values.rAmount;
+        _reflectionBalances[recipient] = _reflectionBalances[recipient] + values.rTransferAmount;   
+
+        
+    }
+
+    /**
+     * @dev Performs transfer from an included account to an excluded account.
+     * (included and excluded from reviving reward.)
+     */
+    function _transferToExcluded(address sender, address recipient, ValuesFromAmount memory values) private {
+        
+        _reflectionBalances[sender] = _reflectionBalances[sender] - values.rAmount;
+        _tokenBalances[recipient] = _tokenBalances[recipient] + values.tTransferAmount;
+        _reflectionBalances[recipient] = _reflectionBalances[recipient] + values.rTransferAmount;    
+
+    }
+
+    /**
+     * @dev Performs transfer from an excluded account to an included account.
+     * (included and excluded from reviving reward.)
+     */
+    function _transferFromExcluded(address sender, address recipient, ValuesFromAmount memory values) private {
+        
+        _tokenBalances[sender] = _tokenBalances[sender] - values.amount;
+        _reflectionBalances[sender] = _reflectionBalances[sender] - values.rAmount;
+        _reflectionBalances[recipient] = _reflectionBalances[recipient] + values.rTransferAmount;   
+
+    }
+
+    /**
+     * @dev Performs transfer between two accounts that are both excluded in reviving reward.
+     */
+    function _transferBothExcluded(address sender, address recipient, ValuesFromAmount memory values) private {
+
+        _tokenBalances[sender] = _tokenBalances[sender] - values.amount;
+        _reflectionBalances[sender] = _reflectionBalances[sender] - values.rAmount;
+        _tokenBalances[recipient] = _tokenBalances[recipient] + values.tTransferAmount;
+        _reflectionBalances[recipient] = _reflectionBalances[recipient] + values.rTransferAmount;        
+
+    }
+    
     /**
      * @dev Destroys `amount` tokens from the caller.
      *
@@ -377,154 +600,68 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         _burn(account, amount);
     }
 
-    function isExcluded(address account) public view returns (bool) {
-        return _isExcludedFromReward[account];
-    }
-
-    function totalFees() public view virtual returns (uint256) {
-        return _tFeeTotal;
-    }
 
     /**
-     * @dev Distribute tokens to all holders that are included from reward. 
-     *
+     * @dev Airdrop tokens to all holders that are included from reward. 
      *  Requirements:
      * - the caller must have a balance of at least `amount`.
      */
     function airdrop(uint256 amount) public {
         address sender = _msgSender();
-        require(!_isExcludedFromReward[sender], "Excluded addresses cannot call this function");
+        //require(!_isExcludedFromReward[sender], "Excluded addresses cannot call this function");
+        require(balanceOf(sender) >= amount, "The caller must have balance >= amount.");
         ValuesFromAmount memory values = _getValues(amount, false);
-        _rBalances[sender] = _rBalances[sender] - values.rAmount;
-        _rTotal = _rTotal - values.rAmount;
-        _tFeeTotal = _tFeeTotal + amount ;
+        if (_isExcludedFromReward[sender]) {
+            _tokenBalances[sender] -= values.amount;
+        }
+        _reflectionBalances[sender] -= values.rAmount;
+        
+        _reflectionTotal = _reflectionTotal - values.rAmount;
+        _totalRewarded += amount ;
+        emit Airdrop(amount);
     }
 
-    function reflectionFromToken(uint256 amount, bool deductTransferFee) public view returns(uint256) {
+    /**
+     * @dev Returns the reflected amount of a token.
+     *  Requirements:
+     * - `amount` must be less than total supply.
+     */
+    function reflectionFromToken(uint256 amount, bool deductTransferFee) internal view returns(uint256) {
         require(amount <= _totalSupply, "Amount must be less than supply");
         ValuesFromAmount memory values = _getValues(amount, deductTransferFee);
         return values.rTransferAmount;
     }
 
     /**
-        Used to figure out the balance of rBalance.
+     * @dev Used to figure out the balance after reflection.
+     * Requirements:
+     * - `rAmount` must be less than reflectTotal.
      */
-    function tokenFromReflection(uint256 rAmount) public view returns(uint256) {
-        require(rAmount <= _rTotal, "Amount must be less than total reflections");
+    function tokenFromReflection(uint256 rAmount) internal view returns(uint256) {
+        require(rAmount <= _reflectionTotal, "Amount must be less than total reflections");
         uint256 currentRate =  _getRate();
         return rAmount / currentRate;
     }
 
-
-    /**
-     * burns
-     * reflect
-     * add liquidity
-
-        tValues = (uint256 tTransferAmount, uint256 tBurnFee, uint256 tRewardFee, uint256 tLiquidityFee);
-        rValues = uint256 rAmount, uint256 rTransferAmount, uint256 rBurnFee, uint256 rRewardFee, uint256 rLiquidityFee;
-     */
-    function _afterTokenTransfer(ValuesFromAmount memory values) internal virtual {
-        // burn from contract address
-        if (_autoBurnEnabled) {
-            _tBalances[address(this)] += values.tBurnFee;
-            _rBalances[address(this)] += values.rBurnFee;
-            _approve(address(this), _msgSender(), values.tBurnFee);
-            burnFrom(address(this), values.tBurnFee);
-        }   
-        
-        
-        // reflect
-        if (_rewardEnabled) {
-            _distributeFee(values.rRewardFee, values.tRewardFee);
-        }
-        
-        
-        // add to liquidity
-        
-        if (_autoSwapAndLiquifyEnabled) {
-            // add liquidity fee to this contract.
-            _tBalances[address(this)] += values.tLiquidityFee;
-            _rBalances[address(this)] += values.rLiquidityFee;
-
-            uint256 contractBalance = _tBalances[address(this)];
-
-            // whether the current contract balances makes the threshold to swap and liquify.
-            bool overMinTokensBeforeSwap = contractBalance >= _minTokensBeforeSwap;
-
-            if (overMinTokensBeforeSwap &&
-                !_inSwapAndLiquify &&
-                _msgSender() != _uniswapV2Pair &&
-                _autoSwapAndLiquifyEnabled
-                ) 
-            {
-                swapAndLiquify(contractBalance);
-            }
-        }
-        
-     }
-
-    
-    function _transferStandard(address sender, address recipient, ValuesFromAmount memory values) private {
-        
-    
-        _rBalances[sender] = _rBalances[sender] - values.rAmount;
-        _rBalances[recipient] = _rBalances[recipient] + values.rTransferAmount;   
-
-        emit Transfer(sender, recipient, values.tTransferAmount);
-    }
-
-    
-    function _transferToExcluded(address sender, address recipient, ValuesFromAmount memory values) private {
-        
-        _rBalances[sender] = _rBalances[sender] - values.rAmount;
-        _tBalances[recipient] = _tBalances[recipient] + values.tTransferAmount;
-        _rBalances[recipient] = _rBalances[recipient] + values.rTransferAmount;    
-
-        
-        emit Transfer(sender, recipient, values.tTransferAmount);
-    }
-
-    
-    function _transferFromExcluded(address sender, address recipient, ValuesFromAmount memory values) private {
-        
-        _tBalances[sender] = _tBalances[sender] - values.amount;
-        _rBalances[sender] = _rBalances[sender] - values.rAmount;
-        _rBalances[recipient] = _rBalances[recipient] + values.rTransferAmount;   
-
-
-        emit Transfer(sender, recipient, values.tTransferAmount);
-    }
-
-    
-    function _transferBothExcluded(address sender, address recipient, ValuesFromAmount memory values) private {
-
-        _tBalances[sender] = _tBalances[sender] - values.amount;
-        _rBalances[sender] = _rBalances[sender] - values.rAmount;
-        _tBalances[recipient] = _tBalances[recipient] + values.tTransferAmount;
-        _rBalances[recipient] = _rBalances[recipient] + values.rTransferAmount;        
-
-        
-        emit Transfer(sender, recipient, values.tTransferAmount);
-    }
-
-    // allow the contract to receive ETH
-    receive() external payable {}
-
     function swapAndLiquify(uint256 contractBalance) internal lockTheSwap {
-        // split the contract balance into two halves.
+        // Split the contract balance into two halves.
         uint256 tokensToSwap = contractBalance / 2;
         uint256 tokensAddToLiquidity = contractBalance - tokensToSwap;
 
-        // contract's current ETH balance.
+        // Contract's current ETH balance.
         uint256 initialBalance = address(this).balance;
 
-        // swap half of the tokens to ETH.
+        // Swap half of the tokens to ETH.
         swapTokensForEth(tokensToSwap);
 
+        // Figure out the exact amount of tokens received from swapping.
         uint256 ethAddToLiquify = address(this).balance - initialBalance;
 
+        // Add to the LP of this token and WETH pair.
         addLiquidity(ethAddToLiquify, tokensAddToLiquidity);
+
+        _totalETHLockedInLiquidity += address(this).balance - initialBalance;
+        _totalTokensLockedInLiquidity += contractBalance - balanceOf(address(this));
 
         emit SwapAndLiquify(tokensToSwap, ethAddToLiquify, tokensAddToLiquidity);
     }
@@ -563,8 +700,8 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     }
     function _distributeFee(uint256 rFee, uint256 tFee) private {
         // to decrease rate thus increase amount reward receive.
-        _rTotal = _rTotal - rFee;
-        _tFeeTotal = _tFeeTotal + tFee;
+        _reflectionTotal = _reflectionTotal - rFee;
+        _totalRewarded += tFee;
     }
     
     function _getValues(uint256 amount, bool deductTransferFee) private view returns (ValuesFromAmount memory) {
@@ -583,7 +720,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
             // calculate fee
             values.tBurnFee = _calculateTax(values.amount, _taxBurn);
             values.tRewardFee = _calculateTax(values.amount, _taxReward);
-            values.tLiquidityFee = _calculateTax(values.amount, _taxLiquidity);
+            values.tLiquidityFee = _calculateTax(values.amount, _taxLiquify);
             
             // amount after fee
             values.tTransferAmount = values.amount - values.tBurnFee - values.tRewardFee - values.tLiquidityFee;
@@ -619,14 +756,14 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     }
 
     function _getCurrentSupply() private view returns(uint256, uint256) {
-        uint256 rSupply = _rTotal;
+        uint256 rSupply = _reflectionTotal;
         uint256 tSupply = _totalSupply;      
         for (uint256 i = 0; i < _excludedFromReward.length; i++) {
-            if (_rBalances[_excludedFromReward[i]] > rSupply || _tBalances[_excludedFromReward[i]] > tSupply) return (_rTotal, _totalSupply);
-            rSupply = rSupply - _rBalances[_excludedFromReward[i]];
-            tSupply = tSupply - _tBalances[_excludedFromReward[i]];
+            if (_reflectionBalances[_excludedFromReward[i]] > rSupply || _tokenBalances[_excludedFromReward[i]] > tSupply) return (_reflectionTotal, _totalSupply);
+            rSupply = rSupply - _reflectionBalances[_excludedFromReward[i]];
+            tSupply = tSupply - _tokenBalances[_excludedFromReward[i]];
         }
-        if (rSupply < _rTotal / _totalSupply) return (_rTotal, _totalSupply);
+        if (rSupply < _reflectionTotal / _totalSupply) return (_reflectionTotal, _totalSupply);
         return (rSupply, tSupply);
     }
 
@@ -676,13 +813,19 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
 
         _uniswapV2Router = uniswapV2Router;
 
+        // exclude uniswapV2Router from receiving reward.
         _excludeAccountFromReward(address(uniswapV2Router));
+        // exclude WETH and this Token Pair from receiving reward.
+        _excludeAccountFromReward(_uniswapV2Pair);
+
+        // exclude uniswapV2Router from paying fees.
         excludeAccountFromFee(address(uniswapV2Router));
+        // exclude WETH and this Token Pair from paying fees.
+        excludeAccountFromFee(_uniswapV2Pair);
 
         // enable
         _autoSwapAndLiquifyEnabled = true;
         setTaxLiquidity(taxLiquidity_);
-        
         
         emit EnabledAutoSwapAndLiquify(taxLiquidity_);
     }
@@ -708,6 +851,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
 
     function disableAutoSwapAndLiquify() public onlyOwner {
         require(_autoSwapAndLiquifyEnabled, "Auto swap and liquify feature is already disabled.");
+
         setTaxLiquidity(0);
         _autoSwapAndLiquifyEnabled = false;
         
@@ -722,7 +866,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
 
     function setTaxBurn(uint8 taxBurn_) public onlyOwner {
         require(_autoBurnEnabled, "Auto burn feature must be enabled. Try the EnableAutoBurn function.");
-        require(taxBurn_ + _taxReward + _taxLiquidity < 100, "Tax fee too high.");
+        require(taxBurn_ + _taxReward + _taxLiquify < 100, "Tax fee too high.");
         uint8 previous = _taxBurn;
         _taxBurn = taxBurn_;
         emit TaxBurnUpdate(previous, _taxBurn);
@@ -730,7 +874,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
 
     function setTaxReward(uint8 taxReward_) public onlyOwner {
         require(_rewardEnabled, "Reward feature must be enabled. Try the EnableReward function.");
-        require(_taxBurn + taxReward_ + _taxLiquidity < 100, "Tax fee too high.");
+        require(_taxBurn + taxReward_ + _taxLiquify < 100, "Tax fee too high.");
         uint8 previous = _taxReward;
         _taxReward = taxReward_;
         emit TaxRewardUpdate(previous, _taxReward);
@@ -739,9 +883,9 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     function setTaxLiquidity(uint8 taxLiquidity_) public onlyOwner {
         require(_autoSwapAndLiquifyEnabled, "Auto swap and liquify feature must be enabled. Try the EnableAutoSwapAndLiquify function.");
         require(_taxBurn + _taxReward + taxLiquidity_ < 100, "Tax fee too high.");
-        uint8 previous = _taxLiquidity;
-        _taxLiquidity = taxLiquidity_;
-        emit TaxLiquidityUpdate(previous, _taxLiquidity);
+        uint8 previous = _taxLiquify;
+        _taxLiquify = taxLiquidity_;
+        emit TaxLiquidityUpdate(previous, _taxLiquify);
     }
 
     function excludeAccountFromFee(address account) public onlyOwner {
@@ -758,8 +902,8 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
 
     function _excludeAccountFromReward(address account) internal onlyOwner {
         require(!_isExcludedFromReward[account], "Account is already excluded");
-        if(_rBalances[account] > 0) {
-            _tBalances[account] = tokenFromReflection(_rBalances[account]);
+        if(_reflectionBalances[account] > 0) {
+            _tokenBalances[account] = tokenFromReflection(_reflectionBalances[account]);
         }
         _isExcludedFromReward[account] = true;
         _excludedFromReward.push(account);
@@ -772,7 +916,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         for (uint256 i = 0; i < _excludedFromReward.length; i++) {
             if (_excludedFromReward[i] == account) {
                 _excludedFromReward[i] = _excludedFromReward[_excludedFromReward.length - 1];
-                _tBalances[account] = 0;
+                _tokenBalances[account] = 0;
                 _isExcludedFromReward[account] = false;
                 _excludedFromReward.pop();
                 break;
