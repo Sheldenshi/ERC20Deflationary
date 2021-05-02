@@ -2,21 +2,21 @@
 
 pragma solidity ^0.8.4;
 
-import "./utils/Context.sol";
-import "./utils/Ownable.sol";
-import "./utils/Address.sol";
-import "../interfaces/IERC20.sol";
-import "../interfaces/Uniswap/IFactory.sol";
-import "../interfaces/Uniswap/IPair.sol";
-import "../interfaces/Uniswap/IRouter01.sol";
-import "../interfaces/Uniswap/IRouter02.sol";
+import "@openzeppelin/contracts/utils/Context.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+
+// (Uni|Pancake)Swap libs are interchangeable
+import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
+import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Pair.sol";
+import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router01.sol";
+import "@uniswap/v2-periphery/contracts/interfaces/IUniswapV2Router02.sol";
 
 /*
     For lines that are marked ERC20 Token Standard, learn more at https://eips.ethereum.org/EIPS/eip-20. 
 */
 contract ERC20Deflationary is Context, IERC20, Ownable {
-
-    using Address for address;
 
     // Keeps track of balances for address that are included in receiving reward.
     mapping (address => uint256) private _reflectionBalances;
@@ -788,7 +788,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
      *
      * Emits {Transfer} event. From this contract to the token and WETH Pai.
      */
-    function addLiquidity(uint256 ethAmount, uint256 tokenAmount) public {
+    function addLiquidity(uint256 ethAmount, uint256 tokenAmount) private {
         _approve(address(this), address(_uniswapV2Router), tokenAmount);
 
         // Add the ETH and token to LP.
