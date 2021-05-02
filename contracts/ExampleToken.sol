@@ -15,7 +15,7 @@ contract ExampleToken is Context, ERC20Deflationary {
     uint8 private taxReward_ = 10;
     uint8 private taxLiquify_ = 10;
     uint256 private minTokensBeforeSwap_ = (10 ** 7) * (10 ** decimal_); 
-    address private pancakeswapV2Router = 0x10ED43C718714eb63d5aA57B78B54704E256024E;
+    address private pancakeswapV2Router = 0xD99D1c33F9fC3444f8101754aBC46c52416550D1;
 
     constructor () ERC20Deflationary(name_, symbol_, decimal_, tokenSupply_) {
         enableAutoBurn(taxBurn_);
