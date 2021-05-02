@@ -114,13 +114,13 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         
         
         // exclude owner and this contract from fee.
-        _excludeFromFee(owner());
-        _excludeFromFee(address(this));
+        excludeAccountFromFee(owner());
+        excludeAccountFromFee(address(this));
 
         // exclude owner, burnAccount, and this contract from receiving rewards.
-        excludeAccountFromReward(owner());
-        excludeAccountFromReward(burnAccount);
-        excludeAccountFromReward(address(this));
+        _excludeAccountFromReward(owner());
+        _excludeAccountFromReward(burnAccount);
+        _excludeAccountFromReward(address(this));
         
         emit Transfer(address(0), _msgSender(), _totalSupply);
     }
@@ -662,7 +662,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         _minTokensBeforeSwap = minTokensBeforeSwap_;
 
         // init Router
-        
+
         IUniswapV2Router02 uniswapV2Router = IUniswapV2Router02(routerAddress);
 
         if (IUniswapV2Factory(uniswapV2Router.factory()).getPair(address(this), uniswapV2Router.WETH()) == address(0)) {
@@ -675,6 +675,9 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         
 
         _uniswapV2Router = uniswapV2Router;
+
+        _excludeAccountFromReward(address(uniswapV2Router));
+        excludeAccountFromFee(address(uniswapV2Router));
 
         // enable
         _autoSwapAndLiquifyEnabled = true;
@@ -741,19 +744,19 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         emit TaxLiquidityUpdate(previous, _taxLiquidity);
     }
 
-    function _excludeFromFee(address account) private onlyOwner {
+    function excludeAccountFromFee(address account) public onlyOwner {
         _isExcludedFromFee[account] = true;
 
         emit ExcludeAccountFromFee(account);
     }
 
-    function _includeInFee(address account) private onlyOwner {
+    function includeAccountInFee(address account) public onlyOwner {
         _isExcludedFromFee[account] = false;
         
         emit IncludeAccountInFee(account);
     }
 
-    function excludeAccountFromReward(address account) public onlyOwner {
+    function _excludeAccountFromReward(address account) internal onlyOwner {
         require(!_isExcludedFromReward[account], "Account is already excluded");
         if(_rBalances[account] > 0) {
             _tBalances[account] = tokenFromReflection(_rBalances[account]);
@@ -764,7 +767,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         emit ExcludeAccountFromReward(account);
     }
 
-    function includeAccountFromReward(address account) public onlyOwner {
+    function _includeAccountFromReward(address account) internal onlyOwner {
         require(_isExcludedFromReward[account], "Account is already included");
         for (uint256 i = 0; i < _excludedFromReward.length; i++) {
             if (_excludedFromReward[i] == account) {
