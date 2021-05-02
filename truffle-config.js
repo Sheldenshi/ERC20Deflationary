@@ -51,7 +51,6 @@ module.exports = {
       provider: () => new HDWalletProvider(mnemonicBNB, `https://data-seed-prebsc-1-s1.binance.org:8545`),
       network_id: 97,
       chainId: 97,
-      gasPrice: 20000000000,
       confirmations: 5,
       timeoutBlocks: 200,
       skipDryRun: true
@@ -67,8 +66,8 @@ module.exports = {
     rinkeby: {
       provider: () => new HDWalletProvider(mnemonicETH, `https://rinkeby.infura.io/v3/${infuraProjectID}`),
       network_id: 4,
-      gas: 4500000,
-      gasPrice: 10000000000,
+      gas: 20000000,
+      gasPrice: 200000000000,
     }
   },
 
