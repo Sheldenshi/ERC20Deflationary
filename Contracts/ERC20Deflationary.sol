@@ -4,6 +4,7 @@ pragma solidity ^0.8.4;
 
 import "./utils/Context.sol";
 import "./utils/Ownable.sol";
+import "./utils/Address.sol";
 import "../interfaces/IERC20.sol";
 import "../interfaces/Pancakeswap/IFactory.sol";
 import "../interfaces/Pancakeswap/IPair.sol";
@@ -14,6 +15,9 @@ import "../interfaces/Pancakeswap/IRouter02.sol";
     For lines that are marked ERC20 Token Standard, learn more at https://eips.ethereum.org/EIPS/eip-20. 
 */
 contract ERC20Deflationary is Context, IERC20, Ownable {
+
+    using Address for address;
+
     // Keeps track of balances for address that are included in receiving reward.
     mapping (address => uint256) private _reflectionBalances;
 
@@ -121,7 +125,6 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         uint256 rTransferAmount;
     }
 
-
     /*
         Events
     */
@@ -129,6 +132,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     event TaxBurnUpdate(uint8 previous, uint8 current);
     event TaxRewardUpdate(uint8 previous, uint8 current);
     event TaxLiquifyUpdate(uint8 previous, uint8 current);
+    event MinTokensBeforeSwapUpdated(uint256 previous, uint256 current);
     event SwapAndLiquify(
         uint256 tokensSwapped,
         uint256 ethReceived,
@@ -138,7 +142,6 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     event IncludeAccountInReward(address account);
     event ExcludeAccountFromFee(address account);
     event IncludeAccountInFee(address account);
-    event MinTokensBeforeSwapUpdated(uint256 previous, uint256 current);
     event EnabledAutoBurn(uint8 taxBurn_);
     event EnabledReward(uint taxReward_);
     event EnabledAutoSwapAndLiquify(uint8 taxLiquify_);
@@ -146,7 +149,6 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     event DisabledReward();
     event DisabledAutoSwapAndLiquify();
     event Airdrop(uint256 amount);
-
     
     constructor (string memory name_, string memory symbol_, uint8 decimals_, uint256 totalSupply_) {
         // Sets the values for `name`, `symbol`, `totalSupply`, `currentSupply`, and `rTotal`.
@@ -600,6 +602,86 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     }
 
     /**
+      * @dev Excludes an account from receiving reward.
+      *
+      * Emits a {ExcludeAccountFromReward} event.
+      *
+      * Requirements:
+      *
+      * - `account` is included in receiving reward.
+      */
+    function _excludeAccountFromReward(address account) internal onlyOwner {
+        require(!_isExcludedFromReward[account], "Account is already excluded.");
+
+        if(_reflectionBalances[account] > 0) {
+            _tokenBalances[account] = tokenFromReflection(_reflectionBalances[account]);
+        }
+        _isExcludedFromReward[account] = true;
+        _excludedFromReward.push(account);
+        
+        emit ExcludeAccountFromReward(account);
+    }
+
+    /**
+      * @dev Includes an account from receiving reward.
+      *
+      * Emits a {IncludeAccountInReward} event.
+      *
+      * Requirements:
+      *
+      * - `account` is excluded in receiving reward.
+      */
+    function _includeAccountInReward(address account) internal onlyOwner {
+        require(_isExcludedFromReward[account], "Account is already included.");
+
+        for (uint256 i = 0; i < _excludedFromReward.length; i++) {
+            if (_excludedFromReward[i] == account) {
+                _excludedFromReward[i] = _excludedFromReward[_excludedFromReward.length - 1];
+                _tokenBalances[account] = 0;
+                _isExcludedFromReward[account] = false;
+                _excludedFromReward.pop();
+                break;
+            }
+        }
+
+        emit IncludeAccountInReward(account);
+    }
+
+     /**
+      * @dev Excludes an account from fee.
+      *
+      * Emits a {ExcludeAccountFromFee} event.
+      *
+      * Requirements:
+      *
+      * - `account` is included in fee.
+      */
+    function excludeAccountFromFee(address account) internal onlyOwner {
+        require(!_isExcludedFromFee[account], "Account is already excluded.");
+
+        _isExcludedFromFee[account] = true;
+
+        emit ExcludeAccountFromFee(account);
+    }
+
+    /**
+      * @dev Includes an account from fee.
+      *
+      * Emits a {IncludeAccountFromFee} event.
+      *
+      * Requirements:
+      *
+      * - `account` is excluded in fee.
+      */
+    function includeAccountInFee(address account) internal onlyOwner {
+        require(_isExcludedFromFee[account], "Account is already included.");
+
+        _isExcludedFromFee[account] = false;
+        
+        emit IncludeAccountInFee(account);
+    }
+
+    /**
      * @dev Airdrop tokens to all holders that are included from reward. 
      *  Requirements:
      * - the caller must have a balance of at least `amount`.
@@ -976,7 +1058,11 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
       */
     function setMinTokensBeforeSwap(uint256 minTokensBeforeSwap_) public onlyOwner {
         require(minTokensBeforeSwap_ < _currentSupply, "minTokensBeforeSwap must be higher than current supply.");
+
+        uint256 previous = _minTokensBeforeSwap;
         _minTokensBeforeSwap = minTokensBeforeSwap_;
+
+        emit MinTokensBeforeSwapUpdated(previous, _minTokensBeforeSwap);
     }
 
     /**
@@ -992,15 +1078,17 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     function setTaxBurn(uint8 taxBurn_) public onlyOwner {
         require(_autoBurnEnabled, "Auto burn feature must be enabled. Try the EnableAutoBurn function.");
         require(taxBurn_ + _taxReward + _taxLiquify < 100, "Tax fee too high.");
+
         uint8 previous = _taxBurn;
         _taxBurn = taxBurn_;
+
         emit TaxBurnUpdate(previous, _taxBurn);
     }
 
     /**
       * @dev Updates taxReward
       *
-      * Emits a {TaxReardUpdate} event.
+      * Emits a {TaxRewardUpdate} event.
       *
       * Requirements:
       *
@@ -1010,8 +1098,10 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     function setTaxReward(uint8 taxReward_) public onlyOwner {
         require(_rewardEnabled, "Reward feature must be enabled. Try the EnableReward function.");
         require(_taxBurn + taxReward_ + _taxLiquify < 100, "Tax fee too high.");
+
         uint8 previous = _taxReward;
         _taxReward = taxReward_;
+
         emit TaxRewardUpdate(previous, _taxReward);
     }
 
@@ -1028,84 +1118,16 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     function setTaxLiquify(uint8 taxLiquify_) public onlyOwner {
         require(_autoSwapAndLiquifyEnabled, "Auto swap and liquify feature must be enabled. Try the EnableAutoSwapAndLiquify function.");
         require(_taxBurn + _taxReward + taxLiquify_ < 100, "Tax fee too high.");
+
         uint8 previous = _taxLiquify;
         _taxLiquify = taxLiquify_;
+
         emit TaxLiquifyUpdate(previous, _taxLiquify);
     }
 
-    /**
-      * @dev Excludes an account from fee.
-      *
-      * Emits a {ExcludeAccountFromFee} event.
-      *
-      * Requirements:
-      *
-      * - `account` is included in fee.
-      */
-    function excludeAccountFromFee(address account) public onlyOwner {
-        require(!_isExcludedFromFee[account], "Account is already excluded");
-        _isExcludedFromFee[account] = true;
-
-        emit ExcludeAccountFromFee(account);
-    }
-
-    /**
-      * @dev Includes an account from fee.
-      *
-      * Emits a {IncludeAccountFromFee} event.
-      *
-      * Requirements:
-      *
-      * - `account` is excluded in fee.
-      */
-    function includeAccountInFee(address account) public onlyOwner {
-        _isExcludedFromFee[account] = false;
-        
-        emit IncludeAccountInFee(account);
-    }
-
-    /**
-      * @dev Excludes an account from receiving reward.
-      *
-      * Emits a {ExcludeAccountFromReward} event.
-      *
-      * Requirements:
-      *
-      * - `account` is included in receiving reward.
-      */
-    function _excludeAccountFromReward(address account) internal onlyOwner {
-        require(!_isExcludedFromReward[account], "Account is already excluded");
-        if(_reflectionBalances[account] > 0) {
-            _tokenBalances[account] = tokenFromReflection(_reflectionBalances[account]);
-        }
-        _isExcludedFromReward[account] = true;
-        _excludedFromReward.push(account);
-        
-        emit ExcludeAccountFromReward(account);
-    }
-
-    /**
-      * @dev Includes an account from receiving reward.
-      *
-      * Emits a {IncludeAccountInReward} event.
-      *
-      * Requirements:
-      *
-      * - `account` is excluded in receiving reward.
-      */
-    function _includeAccountFromReward(address account) internal onlyOwner {
-        require(_isExcludedFromReward[account], "Account is already included");
-        for (uint256 i = 0; i < _excludedFromReward.length; i++) {
-            if (_excludedFromReward[i] == account) {
-                _excludedFromReward[i] = _excludedFromReward[_excludedFromReward.length - 1];
-                _tokenBalances[account] = 0;
-                _isExcludedFromReward[account] = false;
-                _excludedFromReward.pop();
-                break;
-            }
-        }
-
-        emit IncludeAccountInReward(account);
+    function collectDusts() public payable onlyOwner {
+        address payable receiver = payable(_msgSender());
+        require(receiver.send(address(this).balance), "Collect failed.");
     }
 
 }
