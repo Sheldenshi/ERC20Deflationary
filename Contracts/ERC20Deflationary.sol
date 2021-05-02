@@ -152,6 +152,9 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     function decimals() public view virtual returns (uint8) {
         return _decimals;
     }
+    function uniswapV2Pair() public view virtual returns (address) {
+        return _uniswapV2Pair;
+    }
 
     function taxBurn() public view virtual returns (uint8) {
         return _taxBurn;
@@ -540,10 +543,11 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
             amount, 
             0, 
             path, 
-            address(this), 
+            address(this),  // this contract will receive the eth that were swapped from the token
             block.timestamp + 60 * 1000
             );
     }
+
     function addLiquidity(uint256 ethAmount, uint256 tokenAmount) public {
         _approve(address(this), address(_uniswapV2Router), tokenAmount);
 
@@ -553,7 +557,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
             tokenAmount, 
             0, // slippage is unavoidable
             0, // slippage is unavoidable
-            address(this), 
+            owner(), 
             block.timestamp + 60 * 1000
         );
     }
