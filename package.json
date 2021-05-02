@@ -29,8 +29,5 @@
     "ganache-cli": "^6.12.2",
     "truffle": "^5.3.4",
     "truffle-plugin-verify": "^0.5.7"
-  },
-  "peerDependencies": {
-    "@nomiclabs/buidler": "^1.0.0-beta.2"
   }
 }
