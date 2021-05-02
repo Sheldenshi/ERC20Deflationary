@@ -810,12 +810,14 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         _approve(address(this), address(_uniswapV2Router), tokenAmount);
 
         // Add the ETH and token to LP.
+        // The LP tokens will be sent to burnAccount.
+        // No one will have access to them, so the liquidity will be locked forever.
         _uniswapV2Router.addLiquidityETH{value: ethAmount}(
             address(this), 
             tokenAmount, 
             0, // slippage is unavoidable
             0, // slippage is unavoidable
-            owner(), 
+            burnAccount, // the LP is sent to burnAccount. 
             block.timestamp + 60 * 1000
         );
     }
