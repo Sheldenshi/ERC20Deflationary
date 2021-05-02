@@ -42,3 +42,11 @@ In the terminal
 ```
 truffle test
 ```
+## Deploy
+```
+truffle migrate --network testnet
+```
+## Verify
+```
+truffle run verify ExampleToken --network testnet
+```
