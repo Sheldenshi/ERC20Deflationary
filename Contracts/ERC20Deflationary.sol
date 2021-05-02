@@ -5,7 +5,6 @@ pragma solidity ^0.8.4;
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
 // (Uni|Pancake)Swap libs are interchangeable
 import "@uniswap/v2-core/contracts/interfaces/IUniswapV2Factory.sol";
@@ -150,12 +149,12 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
     event DisabledAutoSwapAndLiquify();
     event Airdrop(uint256 amount);
     
-    constructor (string memory name_, string memory symbol_, uint8 decimals_, uint256 totalSupply_) {
+    constructor (string memory name_, string memory symbol_, uint8 decimals_, uint256 tokenSupply_) {
         // Sets the values for `name`, `symbol`, `totalSupply`, `currentSupply`, and `rTotal`.
         _name = name_;
         _symbol = symbol_;
         _decimals = decimals_;
-        _totalSupply = totalSupply_ * (10**decimals_);
+        _totalSupply = tokenSupply_ * (10**decimals_);
         _currentSupply = _totalSupply;
         _reflectionTotal = (~uint256(0) - (~uint256(0) % _totalSupply));
 
@@ -610,7 +609,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
       *
       * - `account` is included in receiving reward.
       */
-    function _excludeAccountFromReward(address account) internal onlyOwner {
+    function _excludeAccountFromReward(address account) internal {
         require(!_isExcludedFromReward[account], "Account is already excluded.");
 
         if(_reflectionBalances[account] > 0) {
@@ -631,7 +630,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
       *
       * - `account` is excluded in receiving reward.
       */
-    function _includeAccountInReward(address account) internal onlyOwner {
+    function _includeAccountInReward(address account) internal {
         require(_isExcludedFromReward[account], "Account is already included.");
 
         for (uint256 i = 0; i < _excludedFromReward.length; i++) {
@@ -656,7 +655,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
       *
       * - `account` is included in fee.
       */
-    function excludeAccountFromFee(address account) internal onlyOwner {
+    function excludeAccountFromFee(address account) internal {
         require(!_isExcludedFromFee[account], "Account is already excluded.");
 
         _isExcludedFromFee[account] = true;
@@ -673,7 +672,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
       *
       * - `account` is excluded in fee.
       */
-    function includeAccountInFee(address account) internal onlyOwner {
+    function includeAccountInFee(address account) internal {
         require(_isExcludedFromFee[account], "Account is already included.");
 
         _isExcludedFromFee[account] = false;
@@ -731,7 +730,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
      * Emits {SwapAndLiquify} event indicating the amount of tokens swapped to eth,
      * the amount of ETH added to the LP, and the amount of tokens added to the LP.
      */
-    function swapAndLiquify(uint256 contractBalance) internal lockTheSwap {
+    function swapAndLiquify(uint256 contractBalance) private lockTheSwap {
         // Split the contract balance into two halves.
         uint256 tokensToSwap = contractBalance / 2;
         uint256 tokensAddToLiquidity = contractBalance - tokensToSwap;
