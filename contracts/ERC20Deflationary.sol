@@ -554,7 +554,6 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         if (_autoBurnEnabled) {
             _tokenBalances[address(this)] += values.tBurnFee;
             _reflectionBalances[address(this)] += values.rBurnFee;
-            _approve(address(this), _msgSender(), values.tBurnFee);
             burnFrom(address(this), values.tBurnFee);
         }   
         
@@ -1045,12 +1044,11 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         // init Router
         IUniswapV2Router02 uniswapV2Router = IUniswapV2Router02(routerAddress);
 
-        if (IUniswapV2Factory(uniswapV2Router.factory()).getPair(address(this), uniswapV2Router.WETH()) == address(0)) {
+        _uniswapV2Pair = IUniswapV2Factory(uniswapV2Router.factory()).getPair(address(this), uniswapV2Router.WETH());
+
+        if (_uniswapV2Pair == address(0)) {
             _uniswapV2Pair = IUniswapV2Factory(uniswapV2Router.factory())
                 .createPair(address(this), uniswapV2Router.WETH());
-        } else {
-            _uniswapV2Pair = IUniswapV2Factory(uniswapV2Router.factory())
-                .getPair(address(this), uniswapV2Router.WETH());
         }
         
         _uniswapV2Router = uniswapV2Router;
