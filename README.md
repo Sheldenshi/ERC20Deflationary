@@ -3,8 +3,8 @@
 ** Reward, reflect, and distribute are used interchangeably in code comments.
 
 An ERC20 Token that charges a + b + c % of transaction fees. 
-- a% of a transaction will be automatically add to the liquidity pool and be locked.
-- b% of a transaction will be redistribute(reflect) to all holders. 
+- a% of a transaction will be automatically added to the liquidity pool and locked.
+- b% of a transaction will be redistribute(reflected) to all holders. 
 - c% of a transaction will be burnt.
 
 
@@ -22,15 +22,30 @@ Example:
 ```
 pragma solidity ^0.8.4;
 
+import "@openzeppelin/contracts/utils/Context.sol";
 import "./ERC20Deflationary.sol";
 
-contract TestCoin is ERC20Deflationary {
-    constructor() ERC20Deflationary("TestCoin", "TEST", 9, 100) {
-         // default is 0
-         // not required
-         setTaxBurn(a);
-         setTaxReward(b);
-         setTaxLiquidity(c);
+contract ExampleToken is Context, ERC20Deflationary {
+
+    string private name_ = "ExampleToken";
+    string private symbol_ = "EXT";
+    uint8 private decimal_ = 9;
+    uint256 private tokenSupply_ = 10 ** 12;
+    uint8 private taxBurn_ = 10;
+    uint8 private taxReward_ = 10;
+    uint8 private taxLiquify_ = 10;
+    uint8 private taxDecimals_ = 0;
+    uint256 private minTokensBeforeSwap_ = (10 ** 6) * (10 ** decimal_);
+
+    //address private routerAddress = // LP provider address
+
+    constructor () ERC20Deflationary(name_, symbol_, decimal_, tokenSupply_) {
+        enableAutoBurn(taxBurn_, taxDecimals_);
+        enableReward(taxReward_, taxDecimals_);
+        enableAutoSwapAndLiquify(taxLiquify_, taxDecimals_, routerAddress, minTokensBeforeSwap_);
+    }
+
+}
     }
 }
 ```
