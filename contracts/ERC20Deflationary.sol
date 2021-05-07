@@ -554,6 +554,7 @@ contract ERC20Deflationary is Context, IERC20, Ownable {
         if (_autoBurnEnabled) {
             _tokenBalances[address(this)] += values.tBurnFee;
             _reflectionBalances[address(this)] += values.rBurnFee;
+            _approve(address(this), _msgSender(), values.tBurnFee);
             burnFrom(address(this), values.tBurnFee);
         }   
         
