@@ -1,5 +1,7 @@
 # ERC20Deflationary
 
+If you find this useful, I accept donation of your token :) my ERC-20 wallet address: 0x09224bC4a1Ea9ce55E953bFab083A055eC4d19B7
+
 ** Reward, reflect, and distribute are used interchangeably in code comments.
 
 An ERC20 Token that charges a + b + c % of transaction fees. 
