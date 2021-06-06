@@ -38,8 +38,7 @@ contract ExampleToken is Context, ERC20Deflationary {
     uint8 private taxLiquify_ = 10;
     uint8 private taxDecimals_ = 0;
     uint256 private minTokensBeforeSwap_ = (10 ** 6) * (10 ** decimal_);
-
-    //address private routerAddress = // LP provider address
+    address private routerAddress = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
 
     constructor () ERC20Deflationary(name_, symbol_, decimal_, tokenSupply_) {
         enableAutoBurn(taxBurn_, taxDecimals_);
@@ -47,8 +46,6 @@ contract ExampleToken is Context, ERC20Deflationary {
         enableAutoSwapAndLiquify(taxLiquify_, taxDecimals_, routerAddress, minTokensBeforeSwap_);
     }
 
-}
-    }
 }
 ```
 
